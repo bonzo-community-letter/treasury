@@ -16,7 +16,7 @@ carried out by the coordinator with the public keys (`302a…`).
 
 Six steps:
 
-1. **Preparation** — what happens, what you need, a role name for the file name.
+1. **Preparation** — what happens, a role name for the file name.
 2. **Generate** — one click, one key; it lives only in React state.
 3. **Save the phrase** — 24 numbered words, two columns of twelve; the page continues
    only after the "stored safely" checkbox.
