@@ -49,27 +49,6 @@ export function IntroStep({ onBegin }: Props) {
       </div>
 
       <div className="mt-8">
-        <p className="eyebrow-sheet">What you need</p>
-        <ul className="mt-3 space-y-2.5 text-[0.9375rem] leading-relaxed text-sheet-ink">
-          <li className="flex gap-3">
-            <span aria-hidden="true" className="mt-[0.65rem] h-[2px] w-4 shrink-0 bg-sheet-rule" />
-            <span>26 minutes in which nobody interrupts you.</span>
-          </li>
-          <li className="flex gap-3">
-            <span aria-hidden="true" className="mt-[0.65rem] h-[2px] w-4 shrink-0 bg-sheet-rule" />
-            <span>
-              Ideally a machine that does nothing else. No network connection is needed —
-              this page works entirely offline.
-            </span>
-          </li>
-          <li className="flex gap-3">
-            <span aria-hidden="true" className="mt-[0.65rem] h-[2px] w-4 shrink-0 bg-sheet-rule" />
-            <span>Paper and a pen, or a password manager.</span>
-          </li>
-        </ul>
-      </div>
-
-      <div className="mt-8">
         <Warning>
           Never pass the phrase or the private key on to anyone — not by email, not in
           chat, not to support. Whoever has these values has the account. The coordinator
