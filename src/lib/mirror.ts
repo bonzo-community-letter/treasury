@@ -228,6 +228,28 @@ export async function fetchMirrorSchedulesByAccount(
   return (body.schedules ?? []).map(toSchedule).filter((s): s is MirrorSchedule => s !== null)
 }
 
+/**
+ * Accounts that hold a given raw public key. Signers are configured as keys,
+ * not as account ids, so this is the bridge: it turns each treasury key into
+ * the account(s) that can create schedules with it. (Verified live: the
+ * mirror's `account.publickey` filter answers with raw hex for both curves.)
+ */
+export async function fetchAccountIdsByPublicKey(
+  network: HederaNetwork,
+  rawKeyHex: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string[]> {
+  const params = new URLSearchParams({ 'account.publickey': rawKeyHex, limit: '5' })
+  const res = await fetchImpl(`${MIRROR_BASE[network]}/accounts?${params}`, {
+    headers: { accept: 'application/json' },
+  })
+  if (!res.ok) return []
+  const body = (await res.json()) as { accounts?: { account?: string }[] }
+  return (body.accounts ?? [])
+    .map((row) => row.account)
+    .filter((id): id is string => typeof id === 'string' && id.length > 0)
+}
+
 /** The live state of one schedule — the authority on signatures and status. */
 export async function fetchMirrorSchedule(
   network: HederaNetwork,

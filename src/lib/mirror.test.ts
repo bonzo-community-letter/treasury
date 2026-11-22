@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fetchMirrorTransactions, waitForCryptoCreate } from './mirror'
+import { fetchAccountIdsByPublicKey, fetchMirrorTransactions, waitForCryptoCreate } from './mirror'
 
 const jsonResponse = (body: unknown, status = 200): Response =>
   ({
@@ -144,5 +144,37 @@ describe('waitForCryptoCreate', () => {
       },
     )
     expect(tx?.entityId).toBe('0.0.4455')
+  })
+})
+
+describe('fetchAccountIdsByPublicKey', () => {
+  const raw = 'b6452e11630db90867c3d75a2ba03463be2a04fa81e0a6d916be0a3ed10c0be9'
+
+  it('asks the mirror for the key and returns every account that holds it', async () => {
+    let asked = ''
+    const ids = await fetchAccountIdsByPublicKey('mainnet', raw, (async (input: RequestInfo) => {
+      asked = String(input)
+      return jsonResponse({ accounts: [{ account: '0.0.111' }, { account: '0.0.222' }] })
+    }) as unknown as typeof fetch)
+    expect(asked).toContain('account.publickey=' + raw)
+    expect(ids).toEqual(['0.0.111', '0.0.222'])
+  })
+
+  it('answers empty on a failed read instead of inventing accounts', async () => {
+    const ids = await fetchAccountIdsByPublicKey(
+      'mainnet',
+      raw,
+      (async () => jsonResponse({}, 500)) as unknown as typeof fetch,
+    )
+    expect(ids).toEqual([])
+  })
+
+  it('drops rows without an account id', async () => {
+    const ids = await fetchAccountIdsByPublicKey(
+      'mainnet',
+      raw,
+      (async () => jsonResponse({ accounts: [{ account: '' }, {}, { account: '0.0.333' }] })) as unknown as typeof fetch,
+    )
+    expect(ids).toEqual(['0.0.333'])
   })
 })

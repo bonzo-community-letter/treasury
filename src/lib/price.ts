@@ -10,7 +10,7 @@
  */
 
 export const COINGECKO_URL =
-  'https://api.coingecko.com/api/v1/simple/price?ids=hedera-hashgraph&vs_currencies=usd'
+  'https://api.coingecko.com/api/v3/simple/price?ids=hedera-hashgraph&vs_currencies=usd'
 
 export const PRICE_CACHE_MS = 60_000
 export const PRICE_SOURCE_LABEL = 'CoinGecko'
