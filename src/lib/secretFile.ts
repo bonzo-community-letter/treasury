@@ -14,7 +14,7 @@ export function slugifyRole(role: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 32)
-  return slug.length > 0 ? slug : 'teilnehmer'
+  return slug.length > 0 ? slug : 'participant'
 }
 
 export function secretFileName(role: string): string {
@@ -30,22 +30,22 @@ export function buildSecretFileText(
     .map((word, i) => `${String(i + 1).padStart(2, ' ')}. ${word}`)
     .join('\n')
   return [
-    'Bonzo Lend Recovery — Schlüssel für das Treasury (Schwelle 1 von 2)',
+    'Bonzo Lend Recovery — key for the recovery treasury (threshold 1 of 2)',
     '',
-    `Rolle:          ${role.trim() || slugifyRole(role)}`,
-    `Erzeugt:        ${generatedAt}`,
-    `Ableitungspfad: ${DERIVATION_PATH} (HashPack-kompatibel)`,
+    `Role:             ${role.trim() || slugifyRole(role)}`,
+    `Generated:        ${generatedAt}`,
+    `Derivation path:  ${DERIVATION_PATH} (HashPack-compatible)`,
     '',
-    'NICHT TEILEN: Phrase und privater Schlüssel gewähren vollen Zugriff auf das',
-    'Konto. Der Koordinator braucht ausschließlich den öffentlichen Schlüssel.',
+    'DO NOT SHARE: the phrase and the private key grant full access to the',
+    'account. The coordinator needs only the public key.',
     '',
-    '24 Wörter (BIP-39, in dieser Reihenfolge):',
+    '24 words (BIP-39, in this order):',
     words,
     '',
-    'Private Key (DER hex, beginnt mit 302e):',
+    'Private key (DER hex, starts with 302e):',
     keys.privateDer,
     '',
-    'Öffentlicher Schlüssel (DER hex, beginnt mit 302a):',
+    'Public key (DER hex, starts with 302a):',
     keys.publicDer,
     '',
   ].join('\n')

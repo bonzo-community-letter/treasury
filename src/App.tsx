@@ -10,12 +10,12 @@ import { DoneStep } from './components/DoneStep'
 import type { GeneratedKeys } from './lib/keys'
 
 const STEPS = [
-  { id: 'intro', label: 'Vorbereitung' },
-  { id: 'generate', label: 'Erzeugen' },
-  { id: 'phrase', label: 'Phrase sichern' },
-  { id: 'quiz', label: 'Nachprüfen' },
-  { id: 'review', label: 'Schlüssel sichern' },
-  { id: 'done', label: 'Fertig' },
+  { id: 'intro', label: 'Preparation' },
+  { id: 'generate', label: 'Generate' },
+  { id: 'phrase', label: 'Save the phrase' },
+  { id: 'quiz', label: 'Spot check' },
+  { id: 'review', label: 'Save the keys' },
+  { id: 'done', label: 'Done' },
 ] as const
 
 type StepId = (typeof STEPS)[number]['id']
@@ -47,14 +47,14 @@ export function App() {
             Bonzo Recovery
           </span>
           <span className="text-[0.625rem] uppercase tracking-[0.16em] text-ink-faint">
-            Schlüssel-Einrichtung
+            Key setup
           </span>
         </div>
       </header>
 
       {/* the one sentence that belongs on every screen */}
       <p className="border-b border-rule/60 bg-hero py-2.5 text-center text-[0.75rem] leading-snug text-ink-soft">
-        Diese Seite sendet nichts — aber der Rechner, an dem du das siehst, muss sauber sein.
+        This page sends nothing — but the machine you are viewing it on must be clean.
       </p>
 
       <main className="mt-8 sm:mt-12">
@@ -68,7 +68,7 @@ export function App() {
                 onClick={restart}
                 className="text-[0.625rem] uppercase tracking-[0.16em] text-sheet-ink-faint transition-colors hover:text-accent"
               >
-                Verwerfen und neu beginnen
+                Discard and start over
               </button>
             </div>
           ) : null}
@@ -113,7 +113,7 @@ export function App() {
       <footer className="border-t border-rule/60">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 py-7 sm:px-6">
           <span className="text-[0.6875rem] uppercase tracking-[0.14em] text-ink-faint">
-            Läuft vollständig im Browser · legt kein Konto an
+            Runs entirely in the browser · creates no account
           </span>
           <span className="text-[0.6875rem] uppercase tracking-[0.14em] text-ink-faint">
             Bonzo Lend Recovery

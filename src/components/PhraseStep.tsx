@@ -14,21 +14,21 @@ export function PhraseStep({ words, onContinue }: Props) {
   return (
     <div>
       <StepHeading
-        title="Die 24 Wörter"
-        note="Notieren Sie die Wörter in dieser Reihenfolge, von Nr. 1 bis Nr. 24 — auf Papier oder im Passwort-Manager. Mit der Phrase ist der Schlüssel für immer wiederherstellbar."
+        title="The 24 words"
+        note="Write the words down in this order, from No. 1 to No. 24 — on paper or in your password manager. With the phrase, the key can always be restored."
       />
 
       <WordGrid words={words} />
 
       <div className="mt-5">
-        <CopyButton text={words.join(' ')} label="Alle 24 Wörter kopieren" />
+        <CopyButton text={words.join(' ')} label="Copy all 24 words" />
       </div>
 
       <div className="mt-8 border-t border-sheet-rule pt-6">
         <AckRow
           checked={saved}
           onChange={setSaved}
-          text="Ich habe alle 24 Wörter in der richtigen Reihenfolge sicher gespeichert."
+          text="I have stored all 24 words safely, in the right order."
         />
       </div>
 
@@ -39,11 +39,11 @@ export function PhraseStep({ words, onContinue }: Props) {
           onClick={onContinue}
           className={primaryAction}
         >
-          Weiter: Stichproben
+          Continue: spot checks
         </button>
         {!saved ? (
           <p className="mt-3 text-xs text-sheet-ink-faint">
-            Erst wenn Sie bestätigt haben, können Sie weiter.
+            You can continue once you have confirmed.
           </p>
         ) : null}
       </div>

@@ -26,14 +26,14 @@ export function CopyButton({ text, label }: CopyProps) {
   const copy = (): void => {
     navigator.clipboard
       ?.writeText(text)
-      .then(() => setNotice('Kopiert'))
-      .catch(() => setNotice('Zwischenablage blockiert — Text markieren und selbst kopieren'))
+      .then(() => setNotice('Copied'))
+      .catch(() => setNotice('Clipboard blocked — select the text and copy it yourself'))
   }
 
   return (
     <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
       <button type="button" onClick={copy} className={miniAction}>
-        {label ?? 'Kopieren'}
+        {label ?? 'Copy'}
       </button>
       {notice ? (
         <span
@@ -59,7 +59,7 @@ export function DownloadButton({ fileName, text }: DownloadProps) {
       onClick={() => downloadSecretFile(fileName, text)}
       className={miniAction}
     >
-      Herunterladen
+      Download
     </button>
   )
 }

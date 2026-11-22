@@ -64,20 +64,20 @@ export function QuizStep({ words, onVerified, onRestart }: Props) {
   return (
     <div>
       <StepHeading
-        title="Fünf Stichproben"
-        note="Tippen Sie die Wörter an den gezeigten Stellen ab. Das ist keine Schikane: erst wenn Sie die Phrase wiedergeben können, liegt sie wirklich bei Ihnen — und nicht nur im Speicher dieses Fensters."
+        title="Five spot checks"
+        note="Type the words at the shown positions. This is no formality: only when you can reproduce the phrase does it truly sit with you — and not only in the memory of this window."
       />
 
       {reveal ? (
         <div>
           <WordGrid words={words} />
           <p className="mt-4 text-xs text-sheet-ink-faint">
-            Danach folgt eine Stichprobe mit anderen Stellen — die Eingaben von vorhin helfen
-            nicht mehr.
+            A spot check with different positions follows — your earlier entries will not
+            help.
           </p>
           <div className="mt-6">
             <button type="button" onClick={reroll} className={primaryAction}>
-              Neue Stichprobe
+              New spot check
             </button>
           </div>
         </div>
@@ -92,8 +92,8 @@ export function QuizStep({ words, onVerified, onRestart }: Props) {
                     htmlFor={`quiz-${position}`}
                     className="eyebrow-sheet"
                   >
-                    Wort Nr. {position + 1}
-                    {isWrong ? <span className="text-accent"> — falsches Wort</span> : null}
+                    Word No. {position + 1}
+                    {isWrong ? <span className="text-accent"> — wrong word</span> : null}
                   </label>
                   <input
                     id={`quiz-${position}`}
@@ -115,8 +115,8 @@ export function QuizStep({ words, onVerified, onRestart }: Props) {
           {wrongPositions.length > 0 ? (
             <div className="mt-6">
               <p className="border-l-2 border-accent pl-3 text-sm leading-relaxed text-sheet-ink-soft">
-                Nicht richtig: {wrongPositions.map((p) => `Nr. ${p + 1}`).join(', ')}. Der Rest
-                war in Ordnung.
+                Not right: {wrongPositions.map((p) => `No. ${p + 1}`).join(', ')}. The rest
+                was fine.
               </p>
               <div className="mt-4">
                 <button
@@ -124,7 +124,7 @@ export function QuizStep({ words, onVerified, onRestart }: Props) {
                   onClick={() => setReveal(true)}
                   className={secondaryAction}
                 >
-                  Phrase nochmal anzeigen
+                  Show the phrase again
                 </button>
               </div>
             </div>
@@ -133,13 +133,13 @@ export function QuizStep({ words, onVerified, onRestart }: Props) {
           {exhausted ? (
             <div className="mt-8">
               <p className="border-l-2 border-accent pl-3 text-sm leading-relaxed text-sheet-ink-soft">
-                Drei Fehlversuche. Wenn sich die Phrase nicht sicher wiedergeben lässt, ist der
-                saubere Weg, von vorne zu beginnen: Der aktuelle Schlüssel wird verworfen, nie
-                gebraucht und nie notiert — und es entsteht ein ganz neuer.
+                Three failed attempts. If the phrase cannot be reproduced with confidence,
+                the clean path is to start over: the current key is discarded — never used,
+                never written down — and a completely new one is created.
               </p>
               <div className="mt-4">
                 <button type="button" onClick={onRestart} className={primaryAction}>
-                  Neu beginnen
+                  Start over
                 </button>
               </div>
             </div>
@@ -147,7 +147,7 @@ export function QuizStep({ words, onVerified, onRestart }: Props) {
 
           <div className="mt-8">
             <button type="button" onClick={check} className={primaryAction}>
-              Prüfen
+              Check
             </button>
           </div>
         </div>

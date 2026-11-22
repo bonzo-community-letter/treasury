@@ -12,73 +12,72 @@ export function IntroStep({ onBegin }: Props) {
   return (
     <div>
       <h2 className="font-serif text-[1.75rem] leading-tight text-sheet-ink sm:text-4xl">
-        Was diese Seite tut
+        What this page does
       </h2>
       <p className="mt-3 max-w-[58ch] text-[0.9375rem] leading-relaxed text-sheet-ink-soft">
-        Sie erzeugen gleich einen frischen ED25519-Schlüssel für das Recovery-Treasury — hier,
-        in diesem Browserfenster, auf diesem Rechner. Alles, was entsteht, war vorher nicht da
-        und geht nach dem Schließen des Fensters verloren. Es wird nichts gesendet.
+        You are about to generate a fresh ED25519 key for the recovery treasury — here, in
+        this browser window, on this machine. Everything that is created did not exist
+        before and is gone once the window closes. Nothing is sent.
       </p>
 
       <div className="mt-8">
-        <p className="eyebrow-sheet">Was passiert</p>
+        <p className="eyebrow-sheet">What happens</p>
         <ul className="mt-3 space-y-2.5 text-[0.9375rem] leading-relaxed text-sheet-ink">
           <li className="flex gap-3">
             <span aria-hidden="true" className="mt-[0.65rem] h-[2px] w-4 shrink-0 bg-sheet-rule" />
             <span>
-              Der Browser erzeugt eine frische 24-Wort-Phrase (BIP-39) und leitet daraus einen
-              privaten und einen öffentlichen Schlüssel ab — mit demselben Ableitungspfad, den
-              HashPack benutzt.
+              The browser generates a fresh 24-word phrase (BIP-39) and derives a private
+              and a public key from it — with the same derivation path HashPack uses.
             </span>
           </li>
           <li className="flex gap-3">
             <span aria-hidden="true" className="mt-[0.65rem] h-[2px] w-4 shrink-0 bg-sheet-rule" />
             <span>
-              Sie notieren beides. Am Ende halten Sie drei Werte in der Hand: die Phrase, den
-              privaten Schlüssel und den öffentlichen Schlüssel.
+              You write both down. At the end you hold three values: the phrase, the
+              private key and the public key.
             </span>
           </li>
           <li className="flex gap-3">
             <span aria-hidden="true" className="mt-[0.65rem] h-[2px] w-4 shrink-0 bg-sheet-rule" />
             <span>
-              Der Koordinator braucht nur den öffentlichen Schlüssel. Damit wird das
-              Treasury-Konto angelegt: ein normales Hedera-Konto mit Schlüssel-Schwelle 1 von 2
-              — je einer Schlüssel für zwei Personen.
+              The coordinator needs only the public key. With it the treasury account is
+              opened: a regular Hedera account with a key threshold of 1 of 2 — one key
+              each for two people.
             </span>
           </li>
         </ul>
       </div>
 
       <div className="mt-8">
-        <p className="eyebrow-sheet">Was Sie brauchen</p>
+        <p className="eyebrow-sheet">What you need</p>
         <ul className="mt-3 space-y-2.5 text-[0.9375rem] leading-relaxed text-sheet-ink">
           <li className="flex gap-3">
             <span aria-hidden="true" className="mt-[0.65rem] h-[2px] w-4 shrink-0 bg-sheet-rule" />
-            <span>26 Minuten, in denen niemand Sie anspricht.</span>
+            <span>26 minutes in which nobody interrupts you.</span>
           </li>
           <li className="flex gap-3">
             <span aria-hidden="true" className="mt-[0.65rem] h-[2px] w-4 shrink-0 bg-sheet-rule" />
             <span>
-              Im Idealfall ein Gerät, das sonst nichts erledigt. Eine Netzverbindung ist nicht
-              nötig — diese Seite funktioniert komplett offline.
+              Ideally a machine that does nothing else. No network connection is needed —
+              this page works entirely offline.
             </span>
           </li>
           <li className="flex gap-3">
             <span aria-hidden="true" className="mt-[0.65rem] h-[2px] w-4 shrink-0 bg-sheet-rule" />
-            <span>Papier und Stift oder einen Passwort-Manager.</span>
+            <span>Paper and a pen, or a password manager.</span>
           </li>
         </ul>
       </div>
 
       <div className="mt-8">
         <Warning>
-          Geben Sie die Phrase oder den privaten Schlüssel niemals an jemanden weiter — nicht
-          per E-Mail, nicht im Chat, nicht an einen Unterstützer. Wer diese Werte hat, hat das
-          Konto. Der Koordinator braucht ausschließlich den öffentlichen Schlüssel.
+          Never pass the phrase or the private key on to anyone — not by email, not in
+          chat, not to support. Whoever has these values has the account. The coordinator
+          needs the public key only.
         </Warning>
         <p className="mt-3 max-w-[58ch] text-xs leading-relaxed text-sheet-ink-faint">
-          Kopieren ist bequem, aber riskant: Auf einem fremden oder unsauberen Gerät landet
-          jeder kopierte Wert in der Zwischenablage. Wo es geht, schreiben Sie von Hand ab.
+          Copying is convenient but risky: on a foreign or unclean machine, every copied
+          value lands in the clipboard. Where you can, transcribe by hand.
         </p>
       </div>
 
@@ -87,25 +86,25 @@ export function IntroStep({ onBegin }: Props) {
           htmlFor="role"
           className="eyebrow-sheet block text-[0.6875rem] font-semibold uppercase tracking-[0.16em]"
         >
-          Ihre Rolle — nur für den Dateinamen
+          Your role — for the file name only
         </label>
         <input
           id="role"
           type="text"
           value={role}
           onChange={(event) => setRole(event.target.value)}
-          placeholder="z. B. zeichner-a"
+          placeholder="e.g. signer-a"
           autoComplete="off"
           className="mt-3 w-full max-w-xs border-b-2 border-sheet-rule bg-transparent px-1 py-1.5 font-mono text-[0.9375rem] text-sheet-ink outline-none transition-colors focus:border-accent"
         />
         <p className="mt-2 text-xs text-sheet-ink-faint">
-          Die Datei heißt später bonzo-key-{slugifyRole(role)}.txt
+          The file will later be named bonzo-key-{slugifyRole(role)}.txt
         </p>
       </div>
 
       <div className="mt-10">
         <button type="button" onClick={() => onBegin(role)} className={primaryAction}>
-          Zur Schlüsselerzeugung
+          To key generation
         </button>
       </div>
     </div>

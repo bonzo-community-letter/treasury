@@ -1,58 +1,57 @@
-# Bonzo Recovery — Schlüssel-Einrichtung
+# Bonzo Recovery — Key setup
 
-Eine kleine Website, die zwei Personen durch je eine Schlüssel-Zeremonie für das
-Recovery-Treasury führt: Sie erzeugt lokal im Browser einen frischen
-ED25519-Schlüssel aus einer neuen 24-Wort-Phrase (BIP-39) und übergibt am Ende
-drei Werte — Phrase, privater Schlüssel, öffentlicher Schlüssel.
+A small website that walks two people, each on their own, through a key ceremony for
+the recovery treasury: it generates a fresh ED25519 key locally in the browser from a
+new 24-word phrase (BIP-39) and hands over three values at the end — the phrase, the
+private key, the public key.
 
-Design und Stack spiegeln die Open-Letter-Site (`/home/agent/repos/open-letter`):
-dieselben Farb-Tokens, dieselben Schriften, derselbe Haufen Papier als Seitenform.
+Design and stack mirror the open-letter site: the same colour tokens, the same fonts,
+the same stack of paper as the page form.
 
-## Was das Tool tut — und was nicht
+## What the tool does — and what it does not
 
-**Es erzeugt Schlüssel. Es legt kein Konto an.** Die Kontogründung (ein normales
-Hedera-Konto mit Schlüssel-Schwelle 1 von 2, zwei Personen, je ein Schlüssel)
-ist ein separater Schritt, den der Koordinator mit den öffentlichen Schlüsseln
-(`302a…`) durchführt.
+**It generates keys. It creates no account.** Opening the account (a regular Hedera
+account with a key threshold of 1 of 2, two people, one key each) is a separate step,
+carried out by the coordinator with the public keys (`302a…`).
 
-Ablauf in sechs Schritten:
+Six steps:
 
-1. **Vorbereitung** — was passiert, was man braucht, Rollenname für den Dateinamen.
-2. **Erzeugen** — ein Klick, ein Schlüssel; er lebt nur im React-State.
-3. **Phrase sichern** — 24 nummerierte Wörter, zwei Spalten zu zwölf; erst nach
-   Checkbox „sicher gespeichert“ geht es weiter.
-4. **Nachprüfen** — fünf zufällige Positionen der Phrase müssen abgetippt werden
-   (Groß-/Kleinschreibung egal, Leerzeichen am Rand egal). Nach einem Fehler:
-   Anzeige der falschen Stellen und „Phrase nochmal anzeigen“; das nächste Quiz
-   fragt andere Stellen. Nach drei Fehlversuchen rät die Seite deutlich zum
-   Neubeginn mit frischem Schlüssel („Neu beginnen“ verwirft den alten State).
-5. **Übersicht** — noch einmal alles auf einem Schirm: die 24 Wörter, der private
-   Schlüssel (`302e…`), der öffentliche Schlüssel (`302a…`), der Ableitungspfad.
-   Pro Block Copy- und Download-Button (`bonzo-key-<rolle>.txt` mit allen drei
-   Werten und dem Pfad). Drei Abhakfeldern, dann „Fertig“.
-6. **Fertig** — „Und jetzt?“: öffentlicher Schlüssel → Koordinator; privater
-   Schlüssel → später HashPack („I already have a wallet“ → privaten Schlüssel
-   importieren → Treasury-Account-ID); Phrase → Backup.
+1. **Preparation** — what happens, what you need, a role name for the file name.
+2. **Generate** — one click, one key; it lives only in React state.
+3. **Save the phrase** — 24 numbered words, two columns of twelve; the page continues
+   only after the "stored safely" checkbox.
+4. **Spot check** — five random positions of the phrase must be typed out (case and
+   surrounding blanks ignored). After a wrong answer: the wrong positions are shown and
+   "Show the phrase again" is offered; the next quiz asks different positions. After
+   three failed attempts the page clearly recommends starting over with a fresh key
+   ("Start over" discards the old state).
+5. **Save the keys** — once more everything on one screen: the 24 words, the private
+   key (`302e…`), the public key (`302a…`), the derivation path. A copy and a download
+   button per block (`bonzo-key-<role>.txt` with all three values and the path). Three
+   checkboxes to tick, then "Done".
+6. **Done** — "What now?": public key → coordinator; private key → HashPack later
+   ("I already have a wallet" → import the private key → treasury account ID);
+   phrase → backup.
 
-## Schlüssel und Ableitung
+## Keys and derivation
 
-Erzeugung ausschließlich mit `@hiero-ledger/sdk` (deklariert `^2.79.0` wie in
-open-letter, im Lockfile auf 2.91.0 festgeschrieben — die Anker-Vektoren laufen
-auf beiden Versionen gleich): `Mnemonic.generate()`
-(frische 24-Wort-Phrase; die Typen designieren `generate()`, zur Laufzeit ist
-das `generate24()`) und `mnemonic.toStandardEd25519PrivateKey()`. Das ist genau
-HashPacks Ableitung: SLIP-0010 über den BIP-39-Samen an `m/44'/3030'/0'/0'`,
-Konto-Index 0, also vollständig `m/44'/3030'/0'/0'/0'`.
+Generation exclusively via `@hiero-ledger/sdk` (declared `^2.79.0` as in open-letter,
+pinned to 2.91.0 in the lockfile — the anchor vectors behave identically on both
+versions): `Mnemonic.generate()` (a fresh 24-word phrase; the type declarations name
+it `generate()`, at runtime it is `generate24()`) and
+`mnemonic.toStandardEd25519PrivateKey()`. That is exactly HashPack's derivation:
+SLIP-0010 over the BIP-39 seed at `m/44'/3030'/0'/0'`, account index 0, so in full
+`m/44'/3030'/0'/0'/0'`.
 
-Angezeigt und exportiert werden die DER-Hex-Strings, die HashPack beim Import
-verlangt: privat `privateKey.toStringDer()` (`302e…`), öffentlich
-`publicKey.toStringDer()` (`302a…`).
+What is shown and exported are the DER hex strings HashPack asks for on import:
+private `privateKey.toStringDer()` (`302e…`), public `publicKey.toStringDer()`
+(`302a…`).
 
-In `src/lib/keys.test.ts` sind zwei Vektor-Anker festgenagelt (BIP-39-Phrasen zu
-All-null- und All-eins-Entropie). Ihre Erwartungswerte wurden vor dem Festschrei­ben
-zweifach hergeleitet: mit dem SDK und mit einer unabhängigen Implementierung
-(PBKDF2-HMAC-SHA512 + SLIP-0010 per `node:crypto`). Werden diese Tests rot,
-passt die Ableitung nicht mehr zu HashPack — Zeremonie stoppen, Ursache klären.
+`src/lib/keys.test.ts` pins two vector anchors (BIP-39 phrases for all-zero and
+all-ones entropy). Their expected values were derived twice over before being
+committed: with the SDK and with an independent implementation (PBKDF2-HMAC-SHA512 +
+SLIP-0010 via `node:crypto`). If these tests go red, the derivation no longer matches
+HashPack — stop the ceremony, find the cause.
 
 ## Start
 
@@ -61,63 +60,68 @@ npm ci
 npm run dev            # http://127.0.0.1:5173
 ```
 
-Statische Auslieferung, wie sie später auf einem USB-Stick liegen kann:
+Static delivery, the way it can later sit on a USB stick:
 
 ```
 npm run build && npm run preview   # http://127.0.0.1:4173
 ```
 
-Qualitätsschranken: `npm test`, `npm run typecheck`.
+Quality gates: `npm test`, `npm run typecheck`.
 
-## Sicherheitsmodell
+## Hosting
 
-- **100 % clientseitig.** Kein Request zur Laufzeit: keine CDN-Referenzen, keine
-  Webfonts, keine Analysen, kein Service Worker. Das Build-HTML verlinkt nur
-  eigene Dateien; die Schriften sind System-Schriften (derselbe Stack wie
-  open-letter), das Favicon liegt in `public/`.
-- **CSP per Meta-Tag:** im Build `default-src 'none'; script-src 'self';
-  style-src 'self'; img-src 'self'; font-src 'self'; object-src 'none';
-  base-uri 'none'; form-action 'none'`. Beim `vite dev` erweitert ein Plugin in
-  `vite.config.ts` die Richtlinie minimal um HMR-WebSocket und Inline-Preamble —
-  nur im Dev-Modus, das Build-HTML enthält die strenge Fassung.
-- **Keine Persistenz.** Kein localStorage, kein indexedDB, keine URL-Parameter,
-  keine Cookies mit Secret-Material. Der Schlüsselzustand lebt ausschließlich im
-  React-State: Seite schließen = alles weg.
-- **Kein `console.log` von Secrets**, keine Secrets in Fehlermeldungen.
-- **Zwischenablage ist ein Kompromiss:** Kopieren wird angeboten, die
-  Intro-Seite sagt, warum Abschreiben von Hand auf fremden Geräten die bessere
-  Wahl ist.
-- **Hinweis-Banner auf jedem Bildschirm:** „Diese Seite sendet nichts — aber der
-  Rechner, an dem du das siehst, muss sauber sein.“ Ein sauberer Rechner ist
-  Annahme, nicht Eigenschaft dieser Seite.
+The build uses a relative asset base (`base: './'` in `vite.config.ts`), so `dist/`
+works served from any path — a subfolder, a stick, or `https://<owner>.github.io/<repo>/`
+alike. `.github/workflows/pages.yml` builds and deploys to GitHub Pages on every push
+to `main` (and on manual dispatch): npm CI, tests, typecheck, build, then
+upload-pages-artifact + deploy-pages.
 
-Ein bekanntes, folgenloses Detail: die `long`-Bibliothek (Transitiv-Abhängigkeit
-des SDK) prüft beim Start mit einem Mini-Wasm, ob WebAssembly verfügbar ist. Die
-strenge CSP blockiert diesen Probe-Test — in der Browser-Konsole erscheinen zwei
-protokollierte „wasm-eval“-Verletzungen aus script-src, `long` fällt schweigend
-JS-Arithmetik zurück. Funktion und Sicherheit sind davon unberührt; wer die
-Konsole sauber haben will, ergänzt `script-src` um `'wasm-unsafe-eval'` — für
-einen Test, den diese App nicht braucht.
+## Security model
 
-## Grenzen bewusst gesetzt
+- **100 % client-side.** No request at runtime: no CDN references, no webfonts, no
+  analytics, no service worker. The built HTML links only its own files; the fonts are
+  system faces (the same stack as open-letter), the favicon lives in `public/`.
+- **CSP via meta tag:** in the build `default-src 'none'; script-src 'self';
+  style-src 'self'; img-src 'self'; font-src 'self'; object-src 'none'; base-uri
+  'none'; form-action 'none'`. Under `vite dev` a plugin in `vite.config.ts` widens
+  the policy minimally for the HMR websocket and the inline preamble — dev mode only;
+  the built HTML carries the strict form.
+- **No persistence.** No localStorage, no indexedDB, no URL parameters, no cookies
+  with secret material. The key state lives only in React state: close the page = it
+  is gone.
+- **No `console.log` of secrets**, no secrets in error messages.
+- **The clipboard is a compromise:** copying is offered; the intro page says why
+  transcribing by hand is the better choice on foreign machines.
+- **Notice banner on every screen:** "This page sends nothing — but the machine you
+  are viewing it on must be clean." A clean machine is an assumption, not a property
+  of this page.
 
-Das Tool gründet kein Konto, sendet nichts, prüft keine Account-ID und signiert
-nichts. Wer einen privaten Schlüssel hier erzeugen lässt, sollte die Zeremonie auf
-einem Gerät durchführen, das er kontrolliert — die Seite kann darüber nichts
-wissen und nichts erzwingen.
+One known, harmless detail: the `long` library (a transitive dependency of the SDK)
+probes at startup with a mini-wasm check whether WebAssembly is available. The strict
+CSP blocks that probe — two logged `wasm-eval` violations from script-src appear in
+the browser console, and `long` silently falls back to JS arithmetic. Function and
+security are unaffected; to keep the console clean, add `'wasm-unsafe-eval'` to
+`script-src` — for a test this app does not need.
 
-## Dateien
+## Limits set deliberately
+
+The tool creates no account, sends nothing, checks no account ID, signs nothing.
+Anyone generating a private key here should run the ceremony on a machine they
+control — the page can know nothing about that and enforce nothing.
+
+## Files
 
 ```
-index.html                 CSP-Meta, Titel, self-hosted Favicon
-public/icon-256.png        Favicon (übernommen aus open-letter)
-vite.config.ts             Stack wie open-letter; CSP-Plugin (dev/build)
-src/main.tsx               Buffer-Polyfill (guardiert), React-Bootstrap
-src/styles.css             Design-Tokens 1:1 aus open-letter
-src/App.tsx                Zustandsmaschine der Zeremonie (sechs Schritte)
-src/components/            Schritt-Komponenten, Sheet, Wortraster, Fortschritt
-src/lib/keys.ts            Schlüsselerzeugung über das SDK
-src/lib/quiz.ts            Stichproben-Logik (rein, getestet)
-src/lib/secretFile.ts      Textdatei bonzo-key-<rolle>.txt (rein, getestet)
-src/lib/*.test.ts          HashPack-Ankervektoren, Quiz, Dateiname/Text
+index.html                 CSP meta, title, self-hosted favicon
+public/icon-256.png        favicon (taken from open-letter)
+vite.config.ts             stack as open-letter; CSP plugin (dev/build), relative base
+.github/workflows/pages.yml  build + deploy to GitHub Pages
+src/main.tsx               buffer polyfill (guarded), React bootstrap
+src/styles.css             design tokens 1:1 from open-letter
+src/App.tsx                the ceremony's state machine (six steps)
+src/components/            step components, sheet, word grid, progress
+src/lib/keys.ts            key generation via the SDK
+src/lib/quiz.ts            spot-check logic (pure, tested)
+src/lib/secretFile.ts      text file bonzo-key-<role>.txt (pure, tested)
+src/lib/*.test.ts          HashPack anchor vectors, quiz, file name/text
 ```

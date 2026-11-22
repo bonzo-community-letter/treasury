@@ -28,8 +28,8 @@ export function GenerateStep({ keys, onGenerated, onContinue }: Props) {
   return (
     <div>
       <StepHeading
-        title="Den Schlüssel erzeugen"
-        note="Ein Klick, einmalig. Der Schlüssel entsteht im Speicher dieses Browserfensters und bleibt dort, bis Sie das Fenster schließen."
+        title="Generate the key"
+        note="One click, once. The key is created in the memory of this browser window and stays there until you close the window."
       />
 
       {!keys ? (
@@ -40,25 +40,24 @@ export function GenerateStep({ keys, onGenerated, onContinue }: Props) {
             onClick={() => void generate()}
             className={primaryAction}
           >
-            {busy ? 'Erzeuge Schlüssel…' : 'Schlüssel erzeugen'}
+            {busy ? 'Generating the key…' : 'Generate the key'}
           </button>
           {failure ? (
             <p className="mt-4 border-l-2 border-accent pl-3 text-sm leading-relaxed text-sheet-ink-soft">
-              Die Erzeugung ist fehlgeschlagen. Laden Sie die Seite neu und versuchen Sie es
-              erneut.
+              Generation failed. Reload the page and try again.
             </p>
           ) : null}
         </div>
       ) : (
         <div>
           <ul className="space-y-2.5 text-[0.9375rem] leading-relaxed text-sheet-ink">
-            <li>— 24 Wörter erzeugt</li>
-            <li>— privaten Schlüssel abgeleitet</li>
-            <li>— öffentlichen Schlüssel abgeleitet</li>
+            <li>— 24 words generated</li>
+            <li>— private key derived</li>
+            <li>— public key derived</li>
           </ul>
           <div className="mt-8">
             <button type="button" onClick={onContinue} className={primaryAction}>
-              Weiter: die 24 Wörter
+              Continue: the 24 words
             </button>
           </div>
         </div>

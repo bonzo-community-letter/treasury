@@ -31,13 +31,13 @@ export function ReviewStep({ keys, role, onFinish }: Props) {
   return (
     <div>
       <StepHeading
-        title="Übersicht"
-        note="Noch einmal alles auf einem Schirm, bevor Sie das Fenster schließen. Was Sie jetzt nicht sichern, ist danach fort."
+        title="Overview"
+        note="Once more, everything on one screen, before you close the window. What you do not save now is gone afterwards."
       />
 
       <section className="border-t border-sheet-rule pt-6">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-          <p className="eyebrow-sheet">Die 24 Wörter</p>
+          <p className="eyebrow-sheet">The 24 words</p>
           <span className="flex flex-wrap gap-3">
             <CopyButton text={keys.words.join(' ')} />
             <DownloadButton fileName={fileName} text={fileText} />
@@ -50,7 +50,7 @@ export function ReviewStep({ keys, role, onFinish }: Props) {
 
       <section className="mt-8 border-t border-sheet-rule pt-6">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-          <p className="eyebrow-sheet">Privater Schlüssel (302e…)</p>
+          <p className="eyebrow-sheet">Private key (302e…)</p>
           <span className="flex flex-wrap gap-3">
             <CopyButton text={keys.privateDer} />
             <DownloadButton fileName={fileName} text={fileText} />
@@ -60,13 +60,13 @@ export function ReviewStep({ keys, role, onFinish }: Props) {
           {keys.privateDer}
         </p>
         <p className="mt-2 text-xs text-sheet-ink-faint">
-          Später der Importwert für HashPack. Niemals weitergeben.
+          Later, the import value for HashPack. Never share it.
         </p>
       </section>
 
       <section className="mt-8 border-t border-sheet-rule pt-6">
         <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2">
-          <p className="eyebrow-sheet">Öffentlicher Schlüssel (302a…)</p>
+          <p className="eyebrow-sheet">Public key (302a…)</p>
           <span className="flex flex-wrap gap-3">
             <CopyButton text={keys.publicDer} />
             <DownloadButton fileName={fileName} text={fileText} />
@@ -76,29 +76,29 @@ export function ReviewStep({ keys, role, onFinish }: Props) {
           {keys.publicDer}
         </p>
         <p className="mt-2 text-xs text-sheet-ink-faint">
-          Dieser Wert geht an den Koordinator — er ist zur Weitergabe gemacht.
+          This value goes to the coordinator — it is meant to be shared.
         </p>
       </section>
 
       <p className="mt-6 font-mono text-xs text-sheet-ink-faint">
-        Ableitungspfad {DERIVATION_PATH} — HashPack-kompatibel
+        Derivation path {DERIVATION_PATH} — HashPack-compatible
       </p>
 
       <div className="mt-8 space-y-3 border-t border-sheet-rule pt-6">
         <AckRow
           checked={acks.phrase}
           onChange={(next) => setAcks((a) => ({ ...a, phrase: next }))}
-          text="Phrase sicher gespeichert."
+          text="Phrase stored safely."
         />
         <AckRow
           checked={acks.private}
           onChange={(next) => setAcks((a) => ({ ...a, private: next }))}
-          text="Privaten Schlüssel sicher gespeichert."
+          text="Private key stored safely."
         />
         <AckRow
           checked={acks.public}
           onChange={(next) => setAcks((a) => ({ ...a, public: next }))}
-          text="Öffentlichen Schlüssel an den Koordinator übermittelt oder sicher abgelegt."
+          text="Public key passed to the coordinator or filed safely."
         />
       </div>
 
@@ -109,7 +109,7 @@ export function ReviewStep({ keys, role, onFinish }: Props) {
           onClick={onFinish}
           className={primaryAction}
         >
-          Fertig
+          Done
         </button>
       </div>
     </div>

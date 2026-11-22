@@ -8,7 +8,7 @@ import {
   registerAttempt,
 } from './quiz'
 
-const WORDS = Array.from({ length: 24 }, (_, i) => `wort${i + 1}`)
+const WORDS = Array.from({ length: 24 }, (_, i) => `word${i + 1}`)
 
 /** Deterministic rng: picks go in pool order (rng always returns 0 → index 0). */
 const zeroRng = () => 0
@@ -48,21 +48,21 @@ describe('gradeQuiz', () => {
   const positions = [10, 23, 0, 5, 17]
 
   it('accepts correct words, ignoring case and surrounding blanks', () => {
-    const answers = ['  WORT11 ', 'wort24', 'Wort1', 'wort6', 'WORT18']
+    const answers = ['  WORD11 ', 'word24', 'Word1', 'word6', 'WORD18']
     const result = gradeQuiz(WORDS, positions, answers)
     expect(result.allCorrect).toBe(true)
     expect(result.wrongPositions).toEqual([])
   })
 
   it('reports exactly the positions that were wrong', () => {
-    const answers = ['wort11', 'falsch', 'wort1', 'wort6', ' ']
+    const answers = ['word11', 'wrongword', 'word1', 'word6', ' ']
     const result = gradeQuiz(WORDS, positions, answers)
     expect(result.allCorrect).toBe(false)
     expect(result.wrongPositions).toEqual([23, 17])
   })
 
   it('treats a missing answer as wrong', () => {
-    const result = gradeQuiz(WORDS, positions, ['wort11', 'wort24'])
+    const result = gradeQuiz(WORDS, positions, ['word11', 'word24'])
     expect(result.allCorrect).toBe(false)
     expect(result.wrongPositions).toEqual([0, 5, 17])
   })
