@@ -1,0 +1,69 @@
+@import 'tailwindcss';
+
+@theme {
+  /* The same tokens as the open-letter site: this is its sister page. */
+  --color-page: #14110e;
+  --color-hero: #1a1611;
+  --color-ink: #f4efe6;
+  --color-ink-soft: #bdb2a3;
+  --color-ink-faint: #94897c;
+  --color-rule: #2e2822;
+  --color-accent: #d97a5a;
+
+  --color-sheet: #fffdfa;
+  --color-sheet-back: #ded7cb;
+  --color-sheet-ink: #17130f;
+  --color-sheet-ink-soft: #4b433c;
+  --color-sheet-ink-faint: #6f6258;
+  --color-sheet-rule: #e6ded3;
+
+  /* The stack the open-letter site already ships: system faces, no webfonts, so the
+     page can run with `font-src 'self'` and nothing external. */
+  --font-serif: ui-serif, Georgia, 'Iowan Old Style', 'Times New Roman', serif;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-page);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: var(--color-page);
+}
+
+/* Small caps label above headings — the same as on the open-letter site. */
+@utility eyebrow {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-ink-faint);
+}
+
+@utility eyebrow-sheet {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-sheet-ink-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
