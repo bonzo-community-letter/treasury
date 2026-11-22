@@ -1,69 +1,154 @@
 import { describe, expect, it } from 'vitest'
-import { Mnemonic } from '@hiero-ledger/sdk'
-import { generateKeys } from './keys'
+import { PrivateKey } from '@hiero-ledger/sdk'
+import { MAX_SIGNERS, addSigner, fingerprint, parseSignerKey, removeSigner } from './keys'
 
-/**
- * HashPack-compatibility anchor.
- *
- * Two vectors whose expected DER values were cross-checked at creation time between
- * (a) @hiero-ledger/sdk 2.79.0 `Mnemonic.fromString(…).toStandardEd25519PrivateKey()`
- * and (b) an independent derivation: BIP-39 seed via PBKDF2-HMAC-SHA512 (2048 rounds,
- * salt "mnemonic") plus SLIP-0010 ed25519 at m/44'/3030'/0'/0'/0', DER-wrapped with
- * node:crypto — equal down to the byte. The phrases are the all-zero and all-ones
- * entropy vectors of BIP-39 (24 words each, checksum per spec).
- *
- * If these tests ever go red, the keys this page hands out no longer match what
- * HashPack derives on import. The ceremony must stop until that is understood.
- */
-const VECTORS = [
-  {
-    name: 'BIP-39 all-zero entropy (24 words)',
-    phrase: `${Array(23).fill('abandon').join(' ')} art`,
-    privateDer:
-      '302e020100300506032b657004220420' +
-      '9f575af0ded30d60f72fe147bb61e8bc359e32d337c65d78b5cd9ab1c34ca5c9',
-    publicDer:
-      '302a300506032b6570032100' +
-      '1aeb9fe89cdd270b5b5905eaed50e5f97ae884f5de2fb58fadc4271f72778884',
-  },
-  {
-    name: 'BIP-39 all-ones entropy (24 words)',
-    phrase: `${Array(23).fill('zoo').join(' ')} vote`,
-    privateDer:
-      '302e020100300506032b657004220420' +
-      'dd0aec9d09d7e6ef67503ba089065c0e9f41405f11625e2e255b26f4709dc491',
-    publicDer:
-      '302a300506032b6570032100' +
-      '2b51f9255310d5a021968f510ec405d67ed8eaef07a7205c1626f31baa49ea0b',
-  },
-] as const
+/** Real ED25519 keys from the SDK — the same strings a signer pastes. */
+async function freshEd25519() {
+  const priv = await PrivateKey.generateED25519()
+  return priv.publicKey
+}
 
-describe('HashPack-compatibility vectors', () => {
-  for (const vector of VECTORS) {
-    it(`${vector.name} derives the expected DER keys`, async () => {
-      const mnemonic = await Mnemonic.fromString(vector.phrase)
-      const privateKey = await mnemonic.toStandardEd25519PrivateKey()
-      expect(privateKey.toStringDer()).toBe(vector.privateDer)
-      expect(privateKey.publicKey.toStringDer()).toBe(vector.publicDer)
-    })
-  }
-})
-
-describe('generateKeys', () => {
-  it('produces 24 words and HashPack-shaped DER strings', async () => {
-    const keys = await generateKeys()
-    expect(keys.words).toHaveLength(24)
-    expect(keys.words.every((word) => /^[a-z]+$/.test(word))).toBe(true)
-    expect(keys.privateDer.startsWith('302e')).toBe(true)
-    expect(keys.publicDer.startsWith('302a')).toBe(true)
+describe('parseSignerKey — DER', () => {
+  it('accepts a 302a… SPKI DER hex', async () => {
+    const pub = await freshEd25519()
+    const parsed = parseSignerKey(pub.toStringDer())
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) expect(parsed.key.toStringRaw()).toBe(pub.toStringRaw())
   })
 
-  it('regenerating from the words reproduces the same keys', async () => {
-    const keys = await generateKeys()
-    const restored = await (
-      await Mnemonic.fromString(keys.words.join(' '))
-    ).toStandardEd25519PrivateKey()
-    expect(restored.toStringDer()).toBe(keys.privateDer)
-    expect(restored.publicKey.toStringDer()).toBe(keys.publicDer)
+  it('accepts uppercase and surrounding whitespace', async () => {
+    const pub = await freshEd25519()
+    const parsed = parseSignerKey(`  ${pub.toStringDer().toUpperCase()}  `)
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) expect(parsed.key.toStringRaw()).toBe(pub.toStringRaw())
+  })
+
+  it('rejects a DER with the ED25519 header but the wrong length', () => {
+    const parsed = parseSignerKey('302a300506032b6570032100' + 'ab'.repeat(20))
+    expect(parsed.ok).toBe(false)
+    if (!parsed.ok) expect(parsed.error).toMatch(/88 hex characters/)
+  })
+
+  it('rejects a truncated SPKI header', () => {
+    const parsed = parseSignerKey('302a300506032b65000000' + 'ab'.repeat(33))
+    expect(parsed.ok).toBe(false)
+    if (!parsed.ok) expect(parsed.error).toMatch(/302a/)
+  })
+})
+
+describe('parseSignerKey — raw ED25519', () => {
+  it('accepts raw 64-hex', async () => {
+    const pub = await freshEd25519()
+    const parsed = parseSignerKey(pub.toStringRaw())
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) expect(parsed.key.toStringDer()).toBe(pub.toStringDer())
+  })
+
+  it('rejects short hex', () => {
+    expect(parseSignerKey('deadbeef').ok).toBe(false)
+    const parsed = parseSignerKey('ab'.repeat(31))
+    expect(parsed.ok).toBe(false)
+  })
+
+  it('rejects anything that is not hex', () => {
+    const parsed = parseSignerKey('0x302a300506032b65700321 00zz')
+    expect(parsed.ok).toBe(false)
+    if (!parsed.ok) expect(parsed.error).toMatch(/hex/)
+  })
+
+  it('rejects an empty input with a human sentence', () => {
+    const parsed = parseSignerKey('   ')
+    expect(parsed.ok).toBe(false)
+    if (!parsed.ok) expect(parsed.error).toMatch(/paste a public key/)
+  })
+})
+
+describe('parseSignerKey — ECDSA', () => {
+  it('accepts a compressed ECDSA DER SPKI (302d…)', async () => {
+    const pub = PrivateKey.generateECDSA().publicKey
+    const parsed = parseSignerKey(pub.toStringDer())
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) expect(parsed.key.toStringRaw()).toBe(pub.toStringRaw())
+  })
+
+  it('accepts a raw ECDSA compressed key (02…)', async () => {
+    const pub = PrivateKey.generateECDSA().publicKey
+    const parsed = parseSignerKey(pub.toStringRaw())
+    expect(parsed.ok).toBe(true)
+    if (parsed.ok) expect(parsed.key.toStringDer()).toBe(pub.toStringDer())
+  })
+
+  it('refuses the uncompressed ECDSA form with a sentence pointing at the fix', async () => {
+    const pub = PrivateKey.generateECDSA().publicKey
+    const uncompressed = `04${pub.toStringRaw().slice(2)}00`.slice(0, 130)
+    const parsed = parseSignerKey(uncompressed)
+    expect(parsed.ok).toBe(false)
+    if (!parsed.ok) expect(parsed.error).toMatch(/compressed/)
+  })
+})
+
+describe('fingerprint', () => {
+  it('shows first six and last four of the DER', () => {
+    expect(fingerprint('302a300506032b6570032100' + 'ab'.repeat(29) + 'c7d3')).toBe('302a30…c7d3')
+  })
+})
+
+describe('addSigner', () => {
+  it('adds and keeps the label', async () => {
+    const pub = await freshEd25519()
+    const result = addSigner([], pub, ' Alice ')
+    expect(result.ok).toBe(true)
+    expect(result.list).toHaveLength(1)
+    expect(result.list[0]?.label).toBe('Alice')
+    expect(result.list[0]?.der).toBe(pub.toStringDer().toLowerCase())
+  })
+
+  it('refuses the same key twice, by raw hex', async () => {
+    const pub = await freshEd25519()
+    const once = addSigner([], pub, 'Alice')
+    const twice = addSigner(once.list, pub, 'Alice again')
+    expect(twice.ok).toBe(false)
+    expect(twice.list).toHaveLength(1)
+    if (!twice.ok) expect(twice.error).toMatch(/already in the list \(Alice\)/)
+  })
+
+  it('names the duplicate by fingerprint when it has no label', async () => {
+    const pub = await freshEd25519()
+    const once = addSigner([], pub, '')
+    const twice = addSigner(once.list, pub, '')
+    expect(twice.ok).toBe(false)
+    if (!twice.ok) expect(twice.error).toContain(fingerprint(pub.toStringDer().toLowerCase()))
+  })
+
+  it('caps the committee at MAX_SIGNERS', async () => {
+    let list: ReturnType<typeof addSigner>['list'] = []
+    for (let i = 0; i < MAX_SIGNERS; i += 1) {
+      const pub = await freshEd25519()
+      const result = addSigner(list, pub, `signer ${i + 1}`)
+      expect(result.ok).toBe(true)
+      list = result.list
+    }
+    expect(list).toHaveLength(MAX_SIGNERS)
+    const overflow = addSigner(list, await freshEd25519(), 'one too many')
+    expect(overflow.ok).toBe(false)
+    if (!overflow.ok) expect(overflow.error).toMatch(/at most 10/)
+  })
+
+  it('does not mutate the list it was given', async () => {
+    const pub = await freshEd25519()
+    const before = addSigner([], pub, 'first').list
+    const snapshot = [...before]
+    addSigner(before, await freshEd25519(), 'second')
+    expect(before).toEqual(snapshot)
+  })
+})
+
+describe('removeSigner', () => {
+  it('removes exactly the row with that id', async () => {
+    const a = await freshEd25519()
+    const b = await freshEd25519()
+    const first = addSigner([], a, 'a').list
+    const both = addSigner(first, b, 'b').list
+    expect(removeSigner(both, both[0]!.id).map((s) => s.label)).toEqual(['b'])
   })
 })

@@ -1,9 +1,9 @@
 {
-  "name": "bonzo-key-setup",
+  "name": "open-letter-treasury",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Key ceremony for the Bonzo Lend recovery treasury — fully client-side ED25519 key generation",
+  "description": "Open Letter Treasury — public treasury stats, admin-created threshold treasuries, and 1-of-N / M-of-N transfers, signed by the connected wallet; the page never sees a key",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
@@ -13,7 +13,13 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@hashgraph/hedera-wallet-connect": "^2.1.3",
+    "@hiero-ledger/proto": "^2.32.1",
     "@hiero-ledger/sdk": "^2.79.0",
+    "@walletconnect/modal": "^2.7.0",
+    "@walletconnect/sign-client": "^2.26.0",
+    "@walletconnect/types": "^2.26.0",
+    "@walletconnect/utils": "^2.26.0",
     "buffer": "^6.0.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"

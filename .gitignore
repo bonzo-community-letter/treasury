@@ -8,6 +8,11 @@ dist/
 coverage/
 *.log
 
+# local config (public values, but per-machine; see .env.example)
+.env
+.env.local
+.env.*.local
+
 # editors
 .vscode/
 .idea/

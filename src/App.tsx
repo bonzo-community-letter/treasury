@@ -1,125 +1,241 @@
-import { useState } from 'react'
-import { Sheet } from './components/Sheet'
-import { StepTracker } from './components/StepTracker'
-import { IntroStep } from './components/IntroStep'
-import { GenerateStep } from './components/GenerateStep'
-import { PhraseStep } from './components/PhraseStep'
-import { QuizStep } from './components/QuizStep'
-import { ReviewStep } from './components/ReviewStep'
-import { DoneStep } from './components/DoneStep'
-import type { GeneratedKeys } from './lib/keys'
-
-const STEPS = [
-  { id: 'intro', label: 'Preparation' },
-  { id: 'generate', label: 'Generate' },
-  { id: 'phrase', label: 'Save the phrase' },
-  { id: 'quiz', label: 'Spot check' },
-  { id: 'review', label: 'Public key' },
-  { id: 'done', label: 'Done' },
-] as const
-
-type StepId = (typeof STEPS)[number]['id']
-const LABELS = STEPS.map((step) => step.label)
+import { useEffect, useMemo, useState } from 'react'
+import { config, urlAccountOverride, walletReady } from './config'
+import { fetchMirrorTransactionsByAccount } from './lib/mirror'
+import { resolveRole, VISITOR_NOTE, type Role } from './lib/roles'
+import { hashscanAccountUrl } from './lib/hedera'
+import { useAccountKey } from './hooks/useAccountKey'
+import { useTreasurySnapshot } from './hooks/useTreasurySnapshot'
+import { useUsdPrice } from './hooks/useUsdPrice'
+import { useWallet } from './hooks/useWallet'
+import { ConnectDialog } from './components/ConnectDialog'
+import { BalanceCard } from './components/BalanceCard'
+import { TransactionsPanel } from './components/TransactionsPanel'
+import { SchedulesPanel } from './components/SchedulesPanel'
+import { CreateTreasuryPanel } from './components/CreateTreasuryPanel'
+import { TransferPanel } from './components/TransferPanel'
+import { Note } from './components/ui'
 
 /**
- * The ceremony, as six steps on one sheet. The only storage the key material ever
- * gets is this component's state: closing the page destroys it, and there is no
- * code path that sends it anywhere.
+ * The treasury page, three layers deep:
+ *
+ *   1. public stats — balance in HBAR and USD, recent transactions, pending
+ *      scheduled transfers — readable by anyone, the default view;
+ *   2. a wallet connection that resolves a role from the chain (admin /
+ *      signer / visitor), shown as a badge;
+ *   3. the actions that role unlocks: creating a treasury (admin) and moving
+ *      HBAR out (admin or signer, direct at 1-of-N, scheduled at m-of-n).
+ *
+ * UI gating is cosmetic. Every transaction is signed and paid by the wallet,
+ * and the chain is what enforces who can do what — see the README.
  */
 export function App() {
-  const [step, setStep] = useState<StepId>('intro')
-  const [role, setRole] = useState('')
-  const [keys, setKeys] = useState<GeneratedKeys | null>(null)
+  const wallet = useWallet()
+  const [dialogOpen, setDialogOpen] = useState(false)
 
-  const stepIndex = STEPS.findIndex((candidate) => candidate.id === step)
+  const urlOverride = useMemo(() => urlAccountOverride(), [])
+  const [discovered, setDiscovered] = useState<string[]>([])
+  const [selected, setSelected] = useState<string | null>(null)
 
-  /** throw away the key material and land back at the generator */
-  const restart = (): void => {
-    setKeys(null)
-    setStep('generate')
-  }
+  // Treasury discovery: what the admin account has created. The configured
+  // list leads when set; the URL override previews any account at all.
+  useEffect(() => {
+    let cancelled = false
+    void fetchMirrorTransactionsByAccount(config.network, config.adminAccount, 100)
+      .then((rows) => {
+        if (cancelled) return
+        setDiscovered(
+          rows
+            .filter((row) => row.name === 'CRYPTOCREATEACCOUNT' && row.entityId !== null)
+            .map((row) => row.entityId as string),
+        )
+      })
+      .catch(() => {
+        // Discovery is a convenience; the config list and ?account= still work.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const treasuries = useMemo(
+    () => [...new Set([...(urlOverride ? [urlOverride] : []), ...config.configuredTreasuryAccounts, ...discovered])],
+    [urlOverride, discovered],
+  )
+  const treasuryId = selected ?? treasuries[0] ?? null
+
+  const treasuryKey = useAccountKey(treasuryId)
+  const walletKey = useAccountKey(wallet.status === 'connected' ? wallet.accountId : null)
+  const snapshot = useTreasurySnapshot(treasuryId, wallet.status === 'connected' ? wallet.accountId : null)
+  const price = useUsdPrice()
+
+  const role = resolveRole({
+    connectedAccountId: wallet.status === 'connected' ? wallet.accountId : null,
+    connectedKeyRaw: walletKey.singleRaw,
+    adminAccount: config.adminAccount,
+    treasuryAccountId: treasuryId,
+    structure: treasuryKey.structure,
+  })
+
+  // One clock tick per second drives every expiry countdown.
+  const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000))
+  useEffect(() => {
+    const timer = setInterval(() => setNowSec(Math.floor(Date.now() / 1000)), 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const connected = wallet.status === 'connected' && wallet.accountId !== null
 
   return (
-    <div className="min-h-dvh bg-page">
-      <header className="sticky top-0 z-40 border-b border-rule/70 bg-page/85 backdrop-blur">
-        <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
-          <span className="font-serif text-[0.9375rem] leading-none tracking-wide text-ink-soft">
-            Open Letter Treasury
-          </span>
-          <span className="text-[0.625rem] uppercase tracking-[0.16em] text-ink-faint">
-            Key setup
-          </span>
+    <div className="min-h-screen">
+      <header className="border-b border-rule bg-hero">
+        <div className="mx-auto flex max-w-4xl flex-wrap items-end justify-between gap-4 px-6 py-8 sm:py-10">
+          <div>
+            <p className="eyebrow">{config.network} · Hedera</p>
+            <h1 className="mt-2 font-serif text-3xl leading-tight text-ink sm:text-4xl">Open Letter Treasury</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            {connected ? (
+              <button
+                type="button"
+                onClick={() => setDialogOpen(true)}
+                className="flex items-center gap-3 border border-rule px-3 py-2 transition-colors hover:border-accent/70"
+              >
+                <span className="font-mono text-xs text-ink-soft">{wallet.accountId}</span>
+                <RoleBadge role={role} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setDialogOpen(true)}
+                className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-ink-faint underline decoration-rule underline-offset-4 transition-colors hover:text-ink hover:decoration-accent"
+              >
+                Connect wallet
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
-      {/* the one sentence that belongs on every screen */}
-      <p className="border-b border-rule/60 bg-hero py-2.5 text-center text-[0.75rem] leading-snug text-ink-soft">
-        This page sends nothing — but the machine you are viewing it on must be clean.
-      </p>
-
-      <main className="mt-8 sm:mt-12">
-        <Sheet>
-          <StepTracker current={stepIndex} labels={LABELS} />
-
-          {keys && step !== 'intro' && step !== 'done' ? (
-            <div className="mb-6 flex justify-end">
-              <button
-                type="button"
-                onClick={restart}
-                className="text-[0.625rem] uppercase tracking-[0.16em] text-sheet-ink-faint transition-colors hover:text-accent"
+      <main className="mx-auto max-w-4xl space-y-6 px-6 py-8 sm:py-10">
+        {treasuries.length > 1 ? (
+          <div className="flex items-center gap-3">
+            <span className="eyebrow">Treasury</span>
+            <select
+              value={treasuryId ?? ''}
+              onChange={(event) => setSelected(event.target.value)}
+              className="border border-rule bg-hero px-3 py-1.5 font-mono text-sm text-ink focus:border-accent/70 focus:outline-none"
+            >
+              {treasuries.map((id) => (
+                <option key={id} value={id}>
+                  {id}
+                </option>
+              ))}
+            </select>
+            {treasuryId ? (
+              <a
+                href={hashscanAccountUrl(config.network, treasuryId)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs underline decoration-rule underline-offset-4 hover:decoration-accent"
               >
-                Discard and start over
-              </button>
-            </div>
-          ) : null}
+                HashScan
+              </a>
+            ) : null}
+          </div>
+        ) : treasuryId ? (
+          <p className="font-mono text-sm text-ink-soft">
+            {treasuryId}{' '}
+            <a
+              href={hashscanAccountUrl(config.network, treasuryId)}
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs underline decoration-rule underline-offset-4 hover:decoration-accent"
+            >
+              HashScan
+            </a>
+          </p>
+        ) : null}
 
-          {step === 'intro' ? (
-            <IntroStep
-              onBegin={(nextRole) => {
-                setRole(nextRole)
-                setStep('generate')
-              }}
+        {treasuries.length === 0 ? (
+          <Note>
+            No treasury exists yet — none is configured and the admin account has not created one.
+            An admin can create one below; any account can be previewed with <code>?account=0.0.x</code> in the URL.
+          </Note>
+        ) : null}
+
+        {treasuryId ? (
+          <>
+            <BalanceCard snapshot={snapshot} price={price} />
+
+            {connected && role === 'visitor' && !walletKey.loading ? <Note>{VISITOR_NOTE}</Note> : null}
+
+            <TransactionsPanel treasuryId={treasuryId} rows={snapshot.transactions} />
+
+            <SchedulesPanel
+              treasuryId={treasuryId}
+              schedules={snapshot.schedules}
+              structure={treasuryKey.structure}
+              role={role}
+              connectedKeyRaw={walletKey.singleRaw}
+              nowSec={nowSec}
+              searchedCreators={snapshot.searchedCreators}
+              onSigned={snapshot.refresh}
             />
-          ) : null}
 
-          {step === 'generate' ? (
-            <GenerateStep
-              keys={keys}
-              onGenerated={setKeys}
-              onContinue={() => setStep('phrase')}
-            />
-          ) : null}
+            {treasuryKey.error && !treasuryKey.loading ? (
+              <p className="text-xs leading-relaxed text-ink-faint">{treasuryKey.error}</p>
+            ) : null}
 
-          {step === 'phrase' && keys ? (
-            <PhraseStep words={keys.words} onContinue={() => setStep('quiz')} />
-          ) : null}
+            {connected && (role === 'admin' || role === 'signer') && treasuryKey.structure ? (
+              <TransferPanel
+                treasuryId={treasuryId}
+                structure={treasuryKey.structure}
+                connectedAccountId={wallet.accountId as string}
+                connectedKeyRaw={walletKey.singleRaw}
+              />
+            ) : null}
+          </>
+        ) : null}
 
-          {step === 'quiz' && keys ? (
-            <QuizStep
-              words={keys.words}
-              onVerified={() => setStep('review')}
-              onRestart={restart}
-            />
-          ) : null}
+        {connected && role === 'admin' ? (
+          <CreateTreasuryPanel
+            onCreated={(accountId) => {
+              setDiscovered((list) => (list.includes(accountId) ? list : [...list, accountId]))
+              setSelected(accountId)
+            }}
+          />
+        ) : null}
 
-          {step === 'review' && keys ? (
-            <ReviewStep keys={keys} role={role} onFinish={() => setStep('done')} />
-          ) : null}
-
-          {step === 'done' ? <DoneStep /> : null}
-        </Sheet>
+        {!walletReady ? (
+          <p className="text-xs leading-relaxed text-ink-faint">
+            Wallet connection is not configured for this build — set the WalletConnect project id
+            (see <code>.env.example</code>). Everything above stays readable without it.
+          </p>
+        ) : null}
       </main>
 
-      <footer className="border-t border-rule/60">
-        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 py-7 sm:px-6">
-          <span className="text-[0.6875rem] uppercase tracking-[0.14em] text-ink-faint">
-            Runs entirely in the browser · creates no account
-          </span>
-          <span className="text-[0.6875rem] uppercase tracking-[0.14em] text-ink-faint">
-            Bonzo Lend Recovery
-          </span>
-        </div>
+      <footer className="border-t border-rule">
+        <p className="mx-auto max-w-4xl px-6 py-6 text-xs leading-relaxed text-ink-faint">
+          A static page on the public mirror node. No backend, no analytics, nothing stored; the
+          wallet signs every transaction and the page never sees a private key.
+        </p>
       </footer>
+
+      <ConnectDialog open={dialogOpen} onClose={() => setDialogOpen(false)} wallet={wallet} />
     </div>
+  )
+}
+
+function RoleBadge({ role }: { role: Role }) {
+  const tone =
+    role === 'admin'
+      ? 'border-accent text-accent'
+      : role === 'signer'
+        ? 'border-ink-faint text-ink-soft'
+        : 'border-rule text-ink-faint'
+  return (
+    <span className={`border px-2 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-[0.14em] ${tone}`}>
+      {role}
+    </span>
   )
 }

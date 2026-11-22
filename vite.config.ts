@@ -1,33 +1,42 @@
+/// <reference types="vitest/config" />
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 /**
- * The page must never reach the network at runtime. The CSP meta tag carries that
- * promise to the browser, and it differs between the two modes for one reason only:
- * the dev server's hot reload needs a websocket and the React plugin's refresh
- * preamble is inline. The built page allows neither.
+ * The page is static and its reach is exactly the policy below: the two public
+ * mirror nodes and CoinGecko (both answer with CORS `*`, verified live), the
+ * WalletConnect relay on both official domains, the WalletConnect explorer
+ * API the connector uses to list and deep-link wallets, and HashPack's site
+ * for its connect deep link. The frame allowance exists only for
+ * WalletConnect's verification iframe. No inline script, no inline style,
+ * nowhere to send anything else.
+ *
+ * Dev widens two lines and nothing else: React Fast Refresh injects a small
+ * inline module preamble, and Vite's HMR client needs a loopback websocket.
  */
-const cspProduction = [
-  "default-src 'none'",
-  "script-src 'self'",
-  "style-src 'self'",
-  "img-src 'self'",
+const cspCommon = [
+  "img-src 'self' data: https:",
   "font-src 'self'",
+  "connect-src 'self' https://mainnet-public.mirrornode.hedera.com https://testnet.mirrornode.hedera.com https://api.coingecko.com wss://relay.walletconnect.com wss://relay.walletconnect.org https://relay.walletconnect.com https://relay.walletconnect.org https://explorer-api.walletconnect.com wss://*.walletconnect.com wss://*.walletconnect.org https://hashpack.app https://www.hashpack.app",
+  'frame-src https://verify.walletconnect.com https://verify.walletconnect.org',
+  'worker-src blob:',
   "object-src 'none'",
   "base-uri 'none'",
   "form-action 'none'",
-].join('; ')
+]
+
+const cspProduction = ["default-src 'none'", "script-src 'self'", "style-src 'self'", ...cspCommon].join('; ')
 
 const cspDev = [
   "default-src 'none'",
   // React Fast Refresh injects a small inline module preamble
   "script-src 'self' 'unsafe-inline'",
   "style-src 'self'",
-  "img-src 'self'",
-  "font-src 'self'",
   // Vite's HMR client connects over a loopback websocket
-  "connect-src 'self' ws:",
+  "connect-src 'self' ws: https://mainnet-public.mirrornode.hedera.com https://testnet.mirrornode.hedera.com https://api.coingecko.com wss://relay.walletconnect.com wss://relay.walletconnect.org https://relay.walletconnect.com https://relay.walletconnect.org https://explorer-api.walletconnect.com wss://*.walletconnect.com wss://*.walletconnect.org https://hashpack.app https://www.hashpack.app",
+  'frame-src https://verify.walletconnect.com https://verify.walletconnect.org',
+  'worker-src blob:',
   "object-src 'none'",
   "base-uri 'none'",
   "form-action 'none'",
@@ -46,39 +55,33 @@ function cspPlugin(): Plugin {
   }
 }
 
-// Optional network exposure for the dev server, as in the open-letter repo. All unset
-// by default: the ceremony runs on loopback, and nothing about one machine's network
-// lives in the code.
-//
-//   DEV_BIND_HOST     interface to listen on (default 127.0.0.1)
-//   PUBLIC_DEV_HOST   hostname clients use (Vite blocks unknown Host headers)
-const devBindHost = process.env.DEV_BIND_HOST?.trim() || '127.0.0.1'
-const publicDevHost = process.env.PUBLIC_DEV_HOST?.trim() || undefined
-const allowedHosts = publicDevHost ? [publicDevHost] : []
-
-// This tool is a local file: the build can be opened from any path. The relative base
-// makes dist portable — it works from a USB stick, from any subdirectory, and from
-// https://<owner>.github.io/<repo>/ alike, with no rebuild. VITE_BASE=/ restores
-// absolute asset paths if ever needed.
+// Served under /treasury/ on the user-site domain via project Pages; the
+// relative base is what makes that work with no rebuild. VITE_BASE=/ restores
+// absolute asset paths for a root-served deploy.
 const base = process.env.VITE_BASE?.trim() || './'
 
 export default defineConfig({
   base,
   plugins: [react(), tailwindcss(), cspPlugin()],
-  build: {
-    target: 'es2022',
-    sourcemap: true,
-  },
   server: {
-    host: devBindHost,
+    // the loopback-only discipline this family of tools keeps (as in the
+    // treasury console): a wallet page reachable from the LAN is how a
+    // rehearsal page becomes a phishing page. No DEV_BIND_HOST escape hatch.
+    host: '127.0.0.1',
     port: 5173,
     strictPort: true,
-    allowedHosts,
   },
   preview: {
-    host: devBindHost,
+    host: '127.0.0.1',
     port: 4173,
     strictPort: true,
-    allowedHosts,
+  },
+  build: {
+    target: 'es2022',
+    sourcemap: false,
+  },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
   },
 })

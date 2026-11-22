@@ -4,13 +4,13 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!--
-      The ceremony never talks to the network. The build-time CSP allows only this
-      origin's own files; during `vite dev` the plugin in vite.config.ts widens it to
-      the hot-reload websocket and inline refresh preamble — see vite.config.ts.
+      The page reads the public mirror and CoinGecko and talks to the WalletConnect
+      relay — the build-time CSP lists exactly those origins and nothing else; during
+      `vite dev` the plugin in vite.config.ts widens it to the hot-reload websocket
+      and inline refresh preamble — see vite.config.ts.
     -->
     <meta http-equiv="Content-Security-Policy" content="__CSP__" />
     <title>Open Letter Treasury</title>
-    <meta name="robots" content="noindex" />
     <link rel="icon" type="image/png" href="%BASE_URL%icon-256.png" />
     <link rel="apple-touch-icon" href="%BASE_URL%icon-256.png" />
   </head>

@@ -1,7 +1,9 @@
 @import 'tailwindcss';
 
 @theme {
-  /* The same tokens as the open-letter site: this is its sister page. */
+  /* The same family as the open-letter site: dark warm paper, one accent.
+     The app stays on the dark page — it is an operator surface, not a
+     letter; the light sheet belonged to the reading surface. */
   --color-page: #14110e;
   --color-hero: #1a1611;
   --color-ink: #f4efe6;
@@ -10,15 +12,6 @@
   --color-rule: #2e2822;
   --color-accent: #d97a5a;
 
-  --color-sheet: #fffdfa;
-  --color-sheet-back: #ded7cb;
-  --color-sheet-ink: #17130f;
-  --color-sheet-ink-soft: #4b433c;
-  --color-sheet-ink-faint: #6f6258;
-  --color-sheet-rule: #e6ded3;
-
-  /* The stack the open-letter site already ships: system faces, no webfonts, so the
-     page can run with `font-src 'self'` and nothing external. */
   --font-serif: ui-serif, Georgia, 'Iowan Old Style', 'Times New Roman', serif;
   --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -42,7 +35,7 @@ body {
   color: var(--color-page);
 }
 
-/* Small caps label above headings — the same as on the open-letter site. */
+/* Small caps label above headings — the family's signature. */
 @utility eyebrow {
   font-size: 0.6875rem;
   font-weight: 600;
@@ -51,12 +44,9 @@ body {
   color: var(--color-ink-faint);
 }
 
-@utility eyebrow-sheet {
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--color-sheet-ink-faint);
+/* Money and timestamps line up in columns, or a table is just long text. */
+@utility tnum {
+  font-variant-numeric: tabular-nums;
 }
 
 @media (prefers-reduced-motion: reduce) {
