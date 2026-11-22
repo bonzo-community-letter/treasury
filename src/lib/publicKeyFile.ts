@@ -1,9 +1,10 @@
 import { DERIVATION_PATH, type GeneratedKeys } from './keys'
 
 /**
- * The text file the ceremony leaves behind: everything one holder needs, in one
- * place, named after their role. Building the text is a pure function; only
- * `downloadSecretFile` touches the DOM.
+ * The text file the ceremony leaves behind: public data only, named after the
+ * holder's role. The phrase and the private key are deliberately absent — the
+ * file must be safe to keep digitally. Building the text is a pure function;
+ * only `downloadTextFile` touches the DOM.
  */
 
 /** Lowercase ASCII for filenames; anything else collapses to single hyphens. */
@@ -17,33 +18,25 @@ export function slugifyRole(role: string): string {
   return slug.length > 0 ? slug : 'participant'
 }
 
-export function secretFileName(role: string): string {
-  return `bonzo-key-${slugifyRole(role)}.txt`
+export function publicKeyFileName(role: string): string {
+  return `treasury-public-key-${slugifyRole(role)}.txt`
 }
 
-export function buildSecretFileText(
+export function buildPublicKeyFileText(
   role: string,
   keys: GeneratedKeys,
   generatedAt: string,
 ): string {
-  const words = keys.words
-    .map((word, i) => `${String(i + 1).padStart(2, ' ')}. ${word}`)
-    .join('\n')
   return [
-    'Bonzo Lend Recovery — key for the recovery treasury (threshold 1 of 2)',
+    'Open Letter Treasury — public key for the recovery treasury (threshold 1 of 2)',
     '',
     `Role:             ${role.trim() || slugifyRole(role)}`,
     `Generated:        ${generatedAt}`,
     `Derivation path:  ${DERIVATION_PATH} (HashPack-compatible)`,
     '',
-    'DO NOT SHARE: the phrase and the private key grant full access to the',
-    'account. The coordinator needs only the public key.',
-    '',
-    '24 words (BIP-39, in this order):',
-    words,
-    '',
-    'Private key (DER hex, starts with 302e):',
-    keys.privateDer,
+    'This file contains public data only — it is safe to keep digitally.',
+    'The 24 words are the secret and live off this machine; whoever holds the',
+    'phrase holds the private key.',
     '',
     'Public key (DER hex, starts with 302a):',
     keys.publicDer,
@@ -52,7 +45,7 @@ export function buildSecretFileText(
 }
 
 /** Offer the text as a download. The browser writes the file; nothing is sent. */
-export function downloadSecretFile(fileName: string, text: string): void {
+export function downloadTextFile(fileName: string, text: string): void {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
   const link = document.createElement('a')
   link.href = url

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { primaryAction, Warning } from './StepUi'
-import { slugifyRole } from '../lib/secretFile'
+import { slugifyRole } from '../lib/publicKeyFile'
 
 interface Props {
   onBegin: (role: string) => void
@@ -33,8 +33,9 @@ export function IntroStep({ onBegin }: Props) {
           <li className="flex gap-3">
             <span aria-hidden="true" className="mt-[0.65rem] h-[2px] w-4 shrink-0 bg-sheet-rule" />
             <span>
-              You write both down. At the end you hold three values: the phrase, the
-              private key and the public key.
+              You keep two values: the phrase, written down off this machine, and the
+              public key, which is safe to share. The private key is never shown and never
+              written to a file — it lives entirely in the phrase.
             </span>
           </li>
           <li className="flex gap-3">

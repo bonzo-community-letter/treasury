@@ -14,7 +14,7 @@ const STEPS = [
   { id: 'generate', label: 'Generate' },
   { id: 'phrase', label: 'Save the phrase' },
   { id: 'quiz', label: 'Spot check' },
-  { id: 'review', label: 'Save the keys' },
+  { id: 'review', label: 'Public key' },
   { id: 'done', label: 'Done' },
 ] as const
 

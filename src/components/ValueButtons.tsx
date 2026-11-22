@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { downloadSecretFile } from '../lib/secretFile'
+import { downloadTextFile } from '../lib/publicKeyFile'
 
 /** The same small paper-toned action the letter pages use for secondary steps. */
 export const miniAction =
@@ -56,7 +56,7 @@ export function DownloadButton({ fileName, text }: DownloadProps) {
   return (
     <button
       type="button"
-      onClick={() => downloadSecretFile(fileName, text)}
+      onClick={() => downloadTextFile(fileName, text)}
       className={miniAction}
     >
       Download
