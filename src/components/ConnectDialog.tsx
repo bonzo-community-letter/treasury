@@ -50,7 +50,7 @@ export function ConnectDialog({ open, onClose, wallet }: Props) {
   const current = wallet.kind ? WALLET_OPTIONS.find((option) => option.kind === wallet.kind) : null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
       <button
         type="button"
         aria-label="Close"
@@ -68,7 +68,7 @@ export function ConnectDialog({ open, onClose, wallet }: Props) {
       >
         <p className="eyebrow">{config.network} network</p>
         <h2 id="connect-title" className="mt-2 font-serif text-2xl leading-tight text-ink">
-          {connected ? 'Wallet connected' : 'Connect your wallet'}
+          {connected ? 'Wallet connected' : 'Connect a wallet'}
         </h2>
 
         {!secure ? (

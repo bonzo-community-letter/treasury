@@ -26,15 +26,15 @@ export function Panel({
 }
 
 export const inputClass =
-  'w-full border border-rule bg-page px-3 py-2.5 text-[0.9375rem] text-ink placeholder:text-ink-faint/70 focus:border-accent/70 focus:outline-none'
+  'w-full rounded-sm border border-rule bg-page/40 px-3 py-2 text-[0.9375rem] text-ink outline-none placeholder:text-ink-faint focus:border-accent'
 
 export const monoInputClass = `${inputClass} font-mono text-[0.8125rem]`
 
 export const primaryAction =
-  'rounded-sm bg-accent px-5 py-2.5 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-page transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40'
+  'rounded-sm border border-accent bg-accent px-5 py-2 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-page transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40'
 
 export const secondaryAction =
-  'rounded-sm border border-rule px-4 py-2.5 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-ink-soft transition-colors hover:border-accent hover:text-ink'
+  'rounded-sm border border-rule px-4 py-2 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-ink-soft transition-colors hover:border-accent hover:text-ink'
 
 /** A caution stripe — the family's one accent, used sparingly. */
 export function Note({ children }: { children: ReactNode }) {

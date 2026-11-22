@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { config, urlAccountOverride, walletReady } from './config'
 import { fetchMirrorTransactionsByAccount } from './lib/mirror'
-import { resolveRole, VISITOR_NOTE, type Role } from './lib/roles'
+import { resolveRole, VISITOR_NOTE } from './lib/roles'
 import { hashscanAccountUrl } from './lib/hedera'
 import { useAccountKey } from './hooks/useAccountKey'
 import { useTreasurySnapshot } from './hooks/useTreasurySnapshot'
 import { useUsdPrice } from './hooks/useUsdPrice'
 import { useWallet } from './hooks/useWallet'
 import { ConnectDialog } from './components/ConnectDialog'
+import { NavBar } from './components/NavBar'
 import { BalanceCard } from './components/BalanceCard'
 import { TransactionsPanel } from './components/TransactionsPanel'
 import { SchedulesPanel } from './components/SchedulesPanel'
@@ -86,44 +87,44 @@ export function App() {
   const connected = wallet.status === 'connected' && wallet.accountId !== null
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-dvh bg-page">
+      <NavBar wallet={wallet} role={role} onConnect={() => setDialogOpen(true)} />
+
       <header className="border-b border-rule bg-hero">
-        <div className="mx-auto flex max-w-4xl flex-wrap items-end justify-between gap-4 px-6 py-8 sm:py-10">
-          <div>
-            <p className="eyebrow">{config.network} · Hedera</p>
-            <h1 className="mt-2 font-serif text-3xl leading-tight text-ink sm:text-4xl">Open Letter Treasury</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            {connected ? (
-              <button
-                type="button"
-                onClick={() => setDialogOpen(true)}
-                className="flex items-center gap-3 border border-rule px-3 py-2 transition-colors hover:border-accent/70"
+        <div className="mx-auto w-full max-w-5xl px-6 pt-10 pb-12 sm:pt-14 sm:pb-16">
+          <p className="eyebrow">Treasury · {config.network}</p>
+          <h1 className="mt-4 max-w-[20ch] font-serif text-[2.25rem] leading-[1.06] tracking-tight text-ink sm:text-5xl">
+            Open Letter Treasury
+          </h1>
+          <p className="mt-5 max-w-[52ch] text-base leading-relaxed text-ink-soft">
+            The account two people hold, one key each. Anyone can read it; moving HBAR out of it
+            takes a signature.
+          </p>
+          {treasuryId ? (
+            <p className="mt-6 text-xs text-ink-faint">
+              <span className="font-mono">{treasuryId}</span>
+              {' · '}
+              <a
+                href={hashscanAccountUrl(config.network, treasuryId)}
+                target="_blank"
+                rel="noreferrer"
+                className="underline decoration-rule underline-offset-4 hover:text-ink-soft hover:decoration-accent"
               >
-                <span className="font-mono text-xs text-ink-soft">{wallet.accountId}</span>
-                <RoleBadge role={role} />
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setDialogOpen(true)}
-                className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-ink-faint underline decoration-rule underline-offset-4 transition-colors hover:text-ink hover:decoration-accent"
-              >
-                Connect wallet
-              </button>
-            )}
-          </div>
+                HashScan
+              </a>
+            </p>
+          ) : null}
         </div>
       </header>
 
-      <main className="mx-auto max-w-4xl space-y-6 px-6 py-8 sm:py-10">
+      <main className="mx-auto w-full max-w-5xl space-y-6 px-6 py-10">
         {treasuries.length > 1 ? (
           <div className="flex items-center gap-3">
             <span className="eyebrow">Treasury</span>
             <select
               value={treasuryId ?? ''}
               onChange={(event) => setSelected(event.target.value)}
-              className="border border-rule bg-hero px-3 py-1.5 font-mono text-sm text-ink focus:border-accent/70 focus:outline-none"
+              className="rounded-sm border border-rule bg-page/40 px-3 py-1.5 font-mono text-sm text-ink focus:border-accent focus:outline-none"
             >
               {treasuries.map((id) => (
                 <option key={id} value={id}>
@@ -131,29 +132,7 @@ export function App() {
                 </option>
               ))}
             </select>
-            {treasuryId ? (
-              <a
-                href={hashscanAccountUrl(config.network, treasuryId)}
-                target="_blank"
-                rel="noreferrer"
-                className="text-xs underline decoration-rule underline-offset-4 hover:decoration-accent"
-              >
-                HashScan
-              </a>
-            ) : null}
           </div>
-        ) : treasuryId ? (
-          <p className="font-mono text-sm text-ink-soft">
-            {treasuryId}{' '}
-            <a
-              href={hashscanAccountUrl(config.network, treasuryId)}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs underline decoration-rule underline-offset-4 hover:decoration-accent"
-            >
-              HashScan
-            </a>
-          </p>
         ) : null}
 
         {treasuries.length === 0 ? (
@@ -214,28 +193,18 @@ export function App() {
         ) : null}
       </main>
 
-      <footer className="border-t border-rule">
-        <p className="mx-auto max-w-4xl px-6 py-6 text-xs leading-relaxed text-ink-faint">
-          A static page on the public mirror node. No backend, no analytics, nothing stored; the
-          wallet signs every transaction and the page never sees a private key.
-        </p>
+      <footer className="border-t border-rule/60">
+        <div className="mx-auto flex w-full max-w-5xl flex-wrap items-baseline justify-between gap-x-6 gap-y-2 px-4 py-7 sm:px-6">
+          <span className="text-[0.6875rem] uppercase tracking-[0.14em] text-ink-faint">
+            Open letter treasury
+          </span>
+          <span className="text-[0.6875rem] uppercase tracking-[0.14em] text-ink-faint">
+            Read from the public mirror node
+          </span>
+        </div>
       </footer>
 
       <ConnectDialog open={dialogOpen} onClose={() => setDialogOpen(false)} wallet={wallet} />
     </div>
-  )
-}
-
-function RoleBadge({ role }: { role: Role }) {
-  const tone =
-    role === 'admin'
-      ? 'border-accent text-accent'
-      : role === 'signer'
-        ? 'border-ink-faint text-ink-soft'
-        : 'border-rule text-ink-faint'
-  return (
-    <span className={`border px-2 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-[0.14em] ${tone}`}>
-      {role}
-    </span>
   )
 }
