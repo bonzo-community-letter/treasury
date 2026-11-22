@@ -56,9 +56,11 @@ const devBindHost = process.env.DEV_BIND_HOST?.trim() || '127.0.0.1'
 const publicDevHost = process.env.PUBLIC_DEV_HOST?.trim() || undefined
 const allowedHosts = publicDevHost ? [publicDevHost] : []
 
-// This tool is a local file: the build can be opened from any path. VITE_BASE=/ keeps
-// absolute asset paths; a relative base lets the dist folder sit anywhere.
-const base = process.env.VITE_BASE?.trim() || '/'
+// This tool is a local file: the build can be opened from any path. The relative base
+// makes dist portable — it works from a USB stick, from any subdirectory, and from
+// https://<owner>.github.io/<repo>/ alike, with no rebuild. VITE_BASE=/ restores
+// absolute asset paths if ever needed.
+const base = process.env.VITE_BASE?.trim() || './'
 
 export default defineConfig({
   base,
