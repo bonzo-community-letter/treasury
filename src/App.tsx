@@ -44,7 +44,7 @@ export function App() {
       <header className="sticky top-0 z-40 border-b border-rule/70 bg-page/85 backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
           <span className="font-serif text-[0.9375rem] leading-none tracking-wide text-ink-soft">
-            Bonzo Recovery
+            Open Letter Treasury
           </span>
           <span className="text-[0.625rem] uppercase tracking-[0.16em] text-ink-faint">
             Key setup

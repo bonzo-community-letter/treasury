@@ -1,4 +1,4 @@
-# Bonzo Recovery — Key setup
+# Open Letter Treasury — Key setup
 
 A small website that walks two people, each on their own, through a key ceremony for
 the recovery treasury: it generates a fresh ED25519 key locally in the browser from a
