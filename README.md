@@ -28,8 +28,9 @@ reads the result back from the public mirror node.
    only signatures from the treasury key list count.
 3. **Actions.** Admin, with no treasury pinned: create one (m-of-n threshold
    account, always a threshold key even at 1-of-N, your wallet pays). With a
-   treasury pinned in `VITE_TREASURY_ACCOUNTS` the create is replaced by a
-   configuration panel — change the threshold and the signer keys
+   treasury pinned in `VITE_TREASURY_ACCOUNTS` the page shows the record and a
+   new-transaction view instead; the create is gone, and the treasury's key
+   (threshold and signers) is edited in the Settings dialog
    (`AccountUpdateTransaction` on the account's key; everything else stays).
    That update is authorized by the treasury's **current** key, so the
    connected wallet must hold one of them; at 1-of-N one wallet suffices, at
@@ -64,14 +65,19 @@ belongs in `.env.local` locally and in **repository variables** for CI — never
 in the repo. Never put a private key or any Hedera account secret in any of
 these files.
 
-**Pinned or discovered.** With an id in `VITE_TREASURY_ACCOUNTS` the page
-configures that account and never offers a create — the deployed build pins
-`0.0.10964554` through the workflow (`vars.VITE_TREASURY_ACCOUNTS || '0.0.10964554'`).
-When `VITE_TREASURY_ACCOUNTS` is empty the page lists
-what the admin account has created (its `CRYPTOCREATEACCOUNT` rows, `entity_id`
-per row) and unions that with the configured list. `?account=0.0.x` in the URL
-overrides everything and previews any account — that is how the app can be
-exercised before a treasury exists in config.
+**Two shapes, decided by `VITE_TREASURY_ACCOUNTS` alone.**
+
+- **Empty** — there is no treasury to read: the page offers only creating one
+  (admin wallet), and no statistics. The workflow reads the value from the
+  repository variable `VITE_TREASURY_ACCOUNTS` (Settings → Secrets and
+  variables → Actions → Variables); nothing is hardcoded in the repo.
+- **An id** — the record for that account (balance in HBAR and USD,
+  transactions, pending schedules) plus a second view for making the next
+  transfer. The key — signers and threshold — lives behind the Settings
+  dialog, reachable only by a wallet that holds one of the treasury's keys.
+
+`?account=0.0.x` in the URL previews any account without touching the config —
+that is how the app can be exercised before a treasury is pinned.
 
 ## What the mirror can and cannot tell you
 

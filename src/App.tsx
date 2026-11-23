@@ -1,6 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { config, urlAccountOverride, walletReady } from './config'
-import { fetchMirrorTransactionsByAccount } from './lib/mirror'
 import { resolveRole, VISITOR_NOTE } from './lib/roles'
 import { hashscanAccountUrl } from './lib/hedera'
 import { useAccountKey } from './hooks/useAccountKey'
@@ -13,19 +12,24 @@ import { BalanceCard } from './components/BalanceCard'
 import { TransactionsPanel } from './components/TransactionsPanel'
 import { SchedulesPanel } from './components/SchedulesPanel'
 import { CreateTreasuryPanel } from './components/CreateTreasuryPanel'
-import { ConfigureTreasuryPanel } from './components/ConfigureTreasuryPanel'
 import { TransferPanel } from './components/TransferPanel'
+import { SettingsDialog } from './components/SettingsDialog'
 import { Note } from './components/ui'
 
+type Tab = 'record' | 'new'
+
 /**
- * The treasury page, three layers deep:
+ * The treasury page. Two shapes, decided by configuration alone:
  *
- *   1. public stats — balance in HBAR and USD, recent transactions, pending
- *      scheduled transfers — readable by anyone, the default view;
- *   2. a wallet connection that resolves a role from the chain (admin /
- *      signer / visitor), shown as a badge;
- *   3. the actions that role unlocks: creating a treasury (admin) and moving
- *      HBAR out (admin or signer, direct at 1-of-N, scheduled at m-of-n).
+ *   - `VITE_TREASURY_ACCOUNTS` empty: there is no treasury to read, so the
+ *     page is the one thing left to do — creating it (admin only), and no
+ *     statistics.
+ *   - an account in `VITE_TREASURY_ACCOUNTS`: the record (balance in HBAR and
+ *     USD, transactions, pending schedules) and a second view for making the
+ *     next transfer. The key — signers and threshold — sits behind a dialog,
+ *     reachable only by a wallet that holds one of the treasury's keys.
+ *
+ * `?account=0.0.x` previews any account without touching the config.
  *
  * UI gating is cosmetic. Every transaction is signed and paid by the wallet,
  * and the chain is what enforces who can do what — see the README.
@@ -33,39 +37,17 @@ import { Note } from './components/ui'
 export function App() {
   const wallet = useWallet()
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [tab, setTab] = useState<Tab>('record')
 
   const urlOverride = useMemo(() => urlAccountOverride(), [])
-  const [discovered, setDiscovered] = useState<string[]>([])
   const [selected, setSelected] = useState<string | null>(null)
 
-  // Treasury discovery: what the admin account has created. The configured
-  // list leads when set; the URL override previews any account at all.
-  useEffect(() => {
-    let cancelled = false
-    void fetchMirrorTransactionsByAccount(config.network, config.adminAccount, 100)
-      .then((rows) => {
-        if (cancelled) return
-        setDiscovered(
-          rows
-            .filter((row) => row.name === 'CRYPTOCREATEACCOUNT' && row.entityId !== null)
-            .map((row) => row.entityId as string),
-        )
-      })
-      .catch(() => {
-        // Discovery is a convenience; the config list and ?account= still work.
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
   const treasuries = useMemo(
-    () => [...new Set([...(urlOverride ? [urlOverride] : []), ...config.configuredTreasuryAccounts, ...discovered])],
-    [urlOverride, discovered],
+    () => [...new Set([...(urlOverride ? [urlOverride] : []), ...config.configuredTreasuryAccounts])],
+    [urlOverride],
   )
   const treasuryId = selected ?? treasuries[0] ?? null
-  /** A treasury pinned in the build config is configured, never replaced by a new one. */
-  const pinnedTreasury = config.configuredTreasuryAccounts.length > 0
 
   const treasuryKey = useAccountKey(treasuryId)
   const walletKey = useAccountKey(wallet.status === 'connected' ? wallet.accountId : null)
@@ -88,6 +70,8 @@ export function App() {
   }, [])
 
   const connected = wallet.status === 'connected' && wallet.accountId !== null
+  const canAct = connected && (role === 'admin' || role === 'signer')
+  const canConfigure = canAct && treasuryKey.structure !== null
 
   return (
     <div className="min-h-dvh bg-page">
@@ -100,13 +84,13 @@ export function App() {
             Open Letter Treasury
           </h1>
           <p className="mt-5 max-w-[52ch] text-base leading-relaxed text-ink-soft">
-            The account two people hold, one key each. Anyone can read it; moving HBAR out of it
-            takes a signature.
+            {treasuryId
+              ? 'The account two people hold, one key each. Anyone can read it; moving HBAR out of it takes a signature.'
+              : 'One account, held by its signers. It is created once, with the signer keys and a threshold.'}
           </p>
           {treasuryId ? (
-            <p className="mt-6 text-xs text-ink-faint">
+            <p className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-ink-faint">
               <span className="font-mono">{treasuryId}</span>
-              {' · '}
               <a
                 href={hashscanAccountUrl(config.network, treasuryId)}
                 target="_blank"
@@ -115,87 +99,119 @@ export function App() {
               >
                 HashScan
               </a>
+              {canConfigure ? (
+                <button
+                  type="button"
+                  onClick={() => setSettingsOpen(true)}
+                  className="text-[0.6875rem] uppercase tracking-[0.14em] text-ink-faint underline decoration-rule underline-offset-4 transition-colors hover:text-ink hover:decoration-accent"
+                >
+                  Settings
+                </button>
+              ) : null}
             </p>
           ) : null}
         </div>
       </header>
 
       <main className="mx-auto w-full max-w-5xl space-y-6 px-6 py-10">
-        {treasuries.length > 1 ? (
-          <div className="flex items-center gap-3">
-            <span className="eyebrow">Treasury</span>
-            <select
-              value={treasuryId ?? ''}
-              onChange={(event) => setSelected(event.target.value)}
-              className="rounded-sm border border-rule bg-page/40 px-3 py-1.5 font-mono text-sm text-ink focus:border-accent focus:outline-none"
-            >
-              {treasuries.map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))}
-            </select>
-          </div>
-        ) : null}
-
-        {treasuries.length === 0 ? (
-          <Note>
-            No treasury exists yet — none is configured and the admin account has not created one.
-            An admin can create one below; any account can be previewed with <code>?account=0.0.x</code> in the URL.
-          </Note>
-        ) : null}
-
-        {treasuryId ? (
-          <>
-            <BalanceCard snapshot={snapshot} price={price} />
-
-            {connected && role === 'visitor' && !walletKey.loading ? <Note>{VISITOR_NOTE}</Note> : null}
-
-            <TransactionsPanel treasuryId={treasuryId} rows={snapshot.transactions} />
-
-            <SchedulesPanel
-              treasuryId={treasuryId}
-              schedules={snapshot.schedules}
-              structure={treasuryKey.structure}
-              role={role}
-              connectedKeyRaw={walletKey.singleRaw}
-              nowSec={nowSec}
-              searchedCreators={snapshot.searchedCreators}
-              onSigned={snapshot.refresh}
+        {treasuryId === null ? (
+          connected && role === 'admin' ? (
+            <CreateTreasuryPanel
+              onCreated={(accountId) => {
+                setSelected(accountId)
+                setTab('record')
+              }}
             />
-
-            {treasuryKey.error && !treasuryKey.loading ? (
-              <p className="text-xs leading-relaxed text-ink-faint">{treasuryKey.error}</p>
+          ) : (
+            <section className="border border-rule bg-hero px-5 py-6 sm:px-8 sm:py-8">
+              <p className="eyebrow">Treasury</p>
+              <h2 className="mt-2 font-serif text-2xl leading-tight text-ink">No treasury yet</h2>
+              <p className="mt-2 max-w-[60ch] text-[0.9375rem] leading-relaxed text-ink-soft">
+                The treasury is created once, by the administrator{' '}
+                <span className="font-mono text-[0.8125rem]">{config.adminAccount}</span>, with the
+                signer keys and a threshold. Connect that wallet to create it.
+              </p>
+              {connected ? (
+                <p className="mt-3 text-xs leading-relaxed text-ink-faint">
+                  This wallet is <span className="font-mono">{wallet.accountId}</span> — not the
+                  administrator, so it cannot create the treasury.
+                </p>
+              ) : null}
+            </section>
+          )
+        ) : (
+          <>
+            {treasuries.length > 1 ? (
+              <div className="flex items-center gap-3">
+                <span className="eyebrow">Treasury</span>
+                <select
+                  value={treasuryId}
+                  onChange={(event) => setSelected(event.target.value)}
+                  className="rounded-sm border border-rule bg-page/40 px-3 py-1.5 font-mono text-sm text-ink focus:border-accent focus:outline-none"
+                >
+                  {treasuries.map((id) => (
+                    <option key={id} value={id}>
+                      {id}
+                    </option>
+                  ))}
+                </select>
+              </div>
             ) : null}
 
-            {connected && (role === 'admin' || role === 'signer') && treasuryKey.structure ? (
+            <nav className="flex items-center gap-6 border-b border-rule/60" aria-label="Views">
+              <TabButton active={tab === 'record'} onClick={() => setTab('record')}>
+                The record
+              </TabButton>
+              <TabButton active={tab === 'new'} onClick={() => setTab('new')}>
+                New transaction
+              </TabButton>
+            </nav>
+
+            {tab === 'record' ? (
+              <>
+                <BalanceCard snapshot={snapshot} price={price} />
+
+                {connected && role === 'visitor' && !walletKey.loading ? <Note>{VISITOR_NOTE}</Note> : null}
+
+                <TransactionsPanel treasuryId={treasuryId} rows={snapshot.transactions} />
+
+                <SchedulesPanel
+                  treasuryId={treasuryId}
+                  schedules={snapshot.schedules}
+                  structure={treasuryKey.structure}
+                  role={role}
+                  connectedKeyRaw={walletKey.singleRaw}
+                  nowSec={nowSec}
+                  searchedCreators={snapshot.searchedCreators}
+                  onSigned={snapshot.refresh}
+                />
+
+                {treasuryKey.error && !treasuryKey.loading ? (
+                  <p className="text-xs leading-relaxed text-ink-faint">{treasuryKey.error}</p>
+                ) : null}
+              </>
+            ) : canAct && treasuryKey.structure ? (
               <TransferPanel
                 treasuryId={treasuryId}
                 structure={treasuryKey.structure}
                 connectedAccountId={wallet.accountId as string}
                 connectedKeyRaw={walletKey.singleRaw}
               />
-            ) : null}
+            ) : (
+              <section className="border border-rule bg-hero px-5 py-6 sm:px-8 sm:py-8">
+                <p className="eyebrow">New transaction</p>
+                <h2 className="mt-2 font-serif text-2xl leading-tight text-ink">
+                  A key of this treasury is needed
+                </h2>
+                <p className="mt-2 max-w-[60ch] text-[0.9375rem] leading-relaxed text-ink-soft">
+                  Moving HBAR out is signed by one of the treasury's keys. Connect a wallet that
+                  holds one — at 1 of {treasuryKey.structure?.keys.length ?? 2} a single signer can
+                  act; above that the transfer becomes a scheduled transaction the threshold signs.
+                </p>
+              </section>
+            )}
           </>
-        ) : null}
-
-        {pinnedTreasury ? (
-          connected && (role === 'admin' || role === 'signer') && treasuryKey.structure && treasuryId ? (
-            <ConfigureTreasuryPanel
-              treasuryId={treasuryId}
-              structure={treasuryKey.structure}
-              connectedKeyRaw={walletKey.singleRaw}
-              onUpdated={treasuryKey.refresh}
-            />
-          ) : null
-        ) : connected && role === 'admin' ? (
-          <CreateTreasuryPanel
-            onCreated={(accountId) => {
-              setDiscovered((list) => (list.includes(accountId) ? list : [...list, accountId]))
-              setSelected(accountId)
-            }}
-          />
-        ) : null}
+        )}
 
         {!walletReady ? (
           <p className="text-xs leading-relaxed text-ink-faint">
@@ -217,6 +233,32 @@ export function App() {
       </footer>
 
       <ConnectDialog open={dialogOpen} onClose={() => setDialogOpen(false)} wallet={wallet} />
+
+      {treasuryId && treasuryKey.structure && canConfigure ? (
+        <SettingsDialog
+          open={settingsOpen}
+          onClose={() => setSettingsOpen(false)}
+          treasuryId={treasuryId}
+          structure={treasuryKey.structure}
+          connectedKeyRaw={walletKey.singleRaw}
+          onUpdated={treasuryKey.refresh}
+        />
+      ) : null}
     </div>
+  )
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      className={`-mb-px border-b-2 pb-2.5 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] transition-colors ${
+        active ? 'border-accent text-ink' : 'border-transparent text-ink-faint hover:text-ink-soft'
+      }`}
+    >
+      {children}
+    </button>
   )
 }
