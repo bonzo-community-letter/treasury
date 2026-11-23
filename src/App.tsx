@@ -201,14 +201,47 @@ export function App() {
             ) : (
               <section className="border border-rule bg-hero px-5 py-6 sm:px-8 sm:py-8">
                 <p className="eyebrow">New transaction</p>
-                <h2 className="mt-2 font-serif text-2xl leading-tight text-ink">
-                  A treasury key is required
-                </h2>
-                <p className="mt-2 max-w-[60ch] text-[0.9375rem] leading-relaxed text-ink-soft">
-                  Sending from this account is signed by one of its keys. Connect a wallet that
-                  holds one. At a threshold of 1 the transfer is sent directly; above 1 it becomes
-                  a scheduled transaction.
-                </p>
+
+                {!connected ? (
+                  <>
+                    <h2 className="mt-2 font-serif text-2xl leading-tight text-ink">
+                      Connect a wallet to send from the treasury
+                    </h2>
+                    <p className="mt-2 max-w-[60ch] text-[0.9375rem] leading-relaxed text-ink-soft">
+                      Only the administrator and the treasury's signers can create a transaction.
+                      At a threshold of 1 the transfer is sent directly; above 1 it becomes a
+                      scheduled transaction and waits for the other signatures.
+                    </p>
+                  </>
+                ) : !canAct ? (
+                  <>
+                    <h2 className="mt-2 font-serif text-2xl leading-tight text-ink">
+                      This wallet has no treasury access
+                    </h2>
+                    <p className="mt-2 max-w-[60ch] text-[0.9375rem] leading-relaxed text-ink-soft">
+                      The connected account{' '}
+                      <span className="break-all font-mono text-[0.875rem] text-ink">
+                        {wallet.accountId}
+                      </span>{' '}
+                      holds none of this treasury's keys. A transfer out of the treasury is signed
+                      by one of those keys, so this wallet can neither create nor sign one — it can
+                      only read the page.
+                    </p>
+                    <p className="mt-3 max-w-[60ch] text-[0.9375rem] leading-relaxed text-ink-soft">
+                      Disconnect it in the bar above and connect the administrator wallet or one of
+                      the signers to create a transaction.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h2 className="mt-2 font-serif text-2xl leading-tight text-ink">
+                      Reading the treasury key…
+                    </h2>
+                    <p className="mt-2 max-w-[60ch] text-[0.9375rem] leading-relaxed text-ink-soft">
+                      The form appears as soon as the key structure is known.
+                    </p>
+                  </>
+                )}
               </section>
             )}
           </>
