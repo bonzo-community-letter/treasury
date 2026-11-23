@@ -629,30 +629,56 @@ export function pollForSession(
   }
 }
 
-/** The same watch, over the real connector. */
+/**
+ * The same watch, over the real connector — plus an immediate look whenever the
+ * page comes back into view, which is exactly the moment a phone returns from
+ * the wallet app. Waiting for the next tick there is a second of nothing.
+ */
 export function watchSession(
   onSession: (session: WalletSession) => void,
   options: { budgetMs?: number; intervalMs?: number } = {},
 ): () => void {
   let instance: DAppConnector | null = null
   let priming = false
-  return pollForSession(
-    () => {
-      if (!instance && !priming) {
-        priming = true
-        void connector()
-          .then((created) => {
-            instance = created
-          })
-          .catch(() => {
-            // A connector that will not start simply means no session yet.
-          })
-      }
-      return instance ? sessionOf(instance) : null
-    },
-    onSession,
-    options,
-  )
+  let delivered = false
+
+  const read = (): WalletSession | null => {
+    if (!instance && !priming) {
+      priming = true
+      void connector()
+        .then((created) => {
+          instance = created
+        })
+        .catch(() => {
+          // A connector that will not start simply means no session yet.
+        })
+    }
+    return instance ? sessionOf(instance) : null
+  }
+
+  const deliver = (session: WalletSession): void => {
+    if (delivered) return
+    delivered = true
+    onSession(session)
+  }
+
+  const stopPolling = pollForSession(read, deliver, { intervalMs: 750, ...options })
+
+  const onVisible = (): void => {
+    if (typeof document === 'undefined' || document.visibilityState !== 'visible') return
+    const session = read()
+    if (session) deliver(session)
+  }
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', onVisible)
+  }
+
+  return () => {
+    stopPolling()
+    if (typeof document !== 'undefined') {
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }
 }
 
 /** Test seam: drop the cached connector between cases. */

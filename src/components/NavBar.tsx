@@ -2,6 +2,7 @@ import type { WalletApi } from '../hooks/useWallet'
 import { config } from '../config'
 import type { Role } from '../lib/roles'
 import { prefetchWallet } from '../lib/wallet'
+import { Spinner } from './ui'
 
 /**
  * The open-letter bar, unchanged in proportion: sticky, thin, one action. The
@@ -50,6 +51,8 @@ export function NavBar({
           >
             {connected ? (
               <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-accent" />
+            ) : busy ? (
+              <Spinner className="text-accent" />
             ) : null}
             <span className={connected ? 'font-mono text-[0.6875rem] tracking-normal normal-case' : ''}>
               {label}

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import type { WalletApi } from '../hooks/useWallet'
+import { Spinner } from './ui'
 import {
   INSECURE_CONTEXT_MESSAGE,
   WALLET_OPTIONS,
@@ -126,7 +127,8 @@ export function ConnectDialog({ open, onClose, wallet }: Props) {
           </>
         ) : busy ? (
           <div className="mt-5">
-            <p className="text-sm leading-relaxed text-ink-soft">
+            <p className="flex items-center gap-2 text-sm leading-relaxed text-ink-soft">
+              <Spinner className="text-accent" />
               {wallet.status === 'restoring'
                 ? 'Restoring your previous session…'
                 : current
