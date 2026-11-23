@@ -8,6 +8,7 @@ import {
   isWalletReturn,
   restore,
   RETURN_PARAM,
+  watchSession,
   type ConnectRoute,
   type WalletKind,
 } from '../lib/wallet'
@@ -75,15 +76,25 @@ export function useWallet(): WalletApi {
     // storage, or an extension it used) is the only one that pays for it —
     // plus the one a wallet app has just sent back here.
     const returning = isWalletReturn()
-    if (!hasStoredSession() && !hasConnectedBefore() && !returning) return
+    const known = hasStoredSession() || hasConnectedBefore()
+    if (!known && !returning) return
     setState({ ...IDLE, status: 'restoring' })
     void restore(returning ? { waitMs: RETURN_WAIT_MS } : {}).then((session) => {
       settle(session)
       if (returning) clearReturnMarker()
     })
 
+    // The one-shot read above is not enough on a phone: the wallet's approval
+    // can land a moment later, and the page must pick it up by itself instead
+    // of waiting for the user to press Connect again.
+    const stopWatching = watchSession((session) => {
+      if (cancelled || attempt.current !== 0) return
+      setState({ status: 'connected', accountId: session.accountId, kind: null, route: null, error: null })
+    })
+
     return () => {
       cancelled = true
+      stopWatching()
     }
   }, [])
 

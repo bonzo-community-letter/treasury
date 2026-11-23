@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   deepLinkFor,
   hasConnectedBefore,
   isMobileWalletTarget,
   isWalletReturn,
+  pollForSession,
   rememberedExtension,
   walletLink,
   walletLinks,
@@ -13,6 +14,47 @@ describe('rememberedExtension', () => {
   it('is null without browser storage — nothing is assumed', () => {
     expect(rememberedExtension()).toBeNull()
     expect(hasConnectedBefore()).toBe(false)
+  })
+
+  const withMarker = (value: string | null): void => {
+    const store = new Map<string, string>()
+    if (value !== null) store.set('treasury.wallet.extension', value)
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem: (key: string) => store.get(key) ?? null,
+        setItem: (key: string, next: string) => void store.set(key, next),
+        removeItem: (key: string) => void store.delete(key),
+        key: (index: number) => [...store.keys()][index] ?? null,
+        get length() {
+          return store.size
+        },
+        clear: () => store.clear(),
+      },
+    })
+  }
+
+  const withoutStorage = (): void => {
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, value: undefined })
+  }
+
+  it('reads a legacy bare kind as an extension', () => {
+    withMarker('hashpack')
+    expect(rememberedExtension()).toBe('hashpack')
+    expect(hasConnectedBefore()).toBe(true)
+    withoutStorage()
+  })
+
+  it('knows the road, and only an extension road is an extension', () => {
+    withMarker('hashpack:extension')
+    expect(rememberedExtension()).toBe('hashpack')
+    withMarker('hashpack:deep-link')
+    expect(rememberedExtension()).toBeNull()
+    expect(hasConnectedBefore()).toBe(true)
+    withMarker('walletconnect:dialog')
+    expect(rememberedExtension()).toBeNull()
+    expect(hasConnectedBefore()).toBe(true)
+    withoutStorage()
   })
 })
 
@@ -81,5 +123,67 @@ describe('isWalletReturn', () => {
     expect(isWalletReturn('?foo=1&wallet=return')).toBe(true)
     expect(isWalletReturn('?wallet=other')).toBe(false)
     expect(isWalletReturn('')).toBe(false)
+  })
+})
+
+describe('pollForSession', () => {
+  it('picks up a session that only arrives after the page is up', async () => {
+    vi.useFakeTimers()
+    try {
+      const seen: string[] = []
+      let reads = 0
+      const stop = pollForSession(
+        () => {
+          reads += 1
+          return reads >= 3 ? { accountId: '0.0.5', network: 'mainnet' as const } : null
+        },
+        (session) => seen.push(session.accountId),
+        { intervalMs: 1_000, budgetMs: 10_000 },
+      )
+      await vi.advanceTimersByTimeAsync(3_500)
+      expect(seen).toEqual(['0.0.5'])
+      stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stops at its budget instead of watching forever', async () => {
+    vi.useFakeTimers()
+    try {
+      let reads = 0
+      const seen: string[] = []
+      const stop = pollForSession(
+        () => {
+          reads += 1
+          return null
+        },
+        (session) => seen.push(session.accountId),
+        { intervalMs: 1_000, budgetMs: 5_000 },
+      )
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(seen).toEqual([])
+      expect(reads).toBeLessThanOrEqual(6)
+      stop()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does nothing after it was stopped', async () => {
+    vi.useFakeTimers()
+    try {
+      const seen: string[] = []
+      const stop = pollForSession(
+        () => ({ accountId: '0.0.5', network: 'mainnet' as const }),
+        (session) => seen.push(session.accountId),
+        { intervalMs: 1_000, budgetMs: 10_000 },
+      )
+      stop()
+      await vi.advanceTimersByTimeAsync(5_000)
+      expect(seen).toEqual([])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

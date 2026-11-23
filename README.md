@@ -164,10 +164,12 @@ deploys as read-only stats and says so quietly at the bottom.
 ## Security model
 
 - Static site, no backend, no analytics, no persistence of anything secret. The
-  browser keeps one flag — which wallet kind last connected through an
-  extension — so a reload knows it may read the stored session back; the
-  restore only reads, it never re-negotiates, so no wallet prompt opens on
-  load. WalletConnect keeps its own session records. No key, no phrase, no
+  browser keeps one flag — which wallet kind last connected, and by which road
+  (extension, deep link, pairing dialog) — so a reload knows it may read the
+  stored session back; the restore only reads, it never re-negotiates, so no
+  wallet prompt opens on load. A phone's approval can land a second after the
+  page is up, so the page keeps watching for the session instead of checking
+  once. WalletConnect keeps its own session records. No key, no phrase, no
   transaction data is stored.
   Reads: the two mirror nodes and CoinGecko. Writes: only what a connected
   wallet signs.

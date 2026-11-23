@@ -427,19 +427,25 @@ export async function connect(kind: WalletKind, options: ConnectOptions = {}): P
   const existing = sessionOf(instance)
   if (existing) return existing
 
+  // Which road this attempt took, so the marker records how to restore it.
+  let route: ConnectRoute = 'dialog'
+  const note = (taken: ConnectRoute): void => {
+    route = taken
+    options.onRoute?.(taken)
+  }
+
   try {
     // 1. An extension that answers the Hedera handshake connects directly.
     const extension = kind === 'walletconnect' ? null : await waitForExtension(instance, kind)
     if (extension) {
-      options.onRoute?.('extension')
+      note('extension')
       await withTimeout(
         instance.connectExtension(extension.id),
         CONNECT_TIMEOUT_MS,
         'The wallet did not answer in time. Please try again.',
       )
-      rememberExtension(kind)
     } else if (kind === 'walletconnect') {
-      options.onRoute?.('dialog')
+      note('dialog')
       await withTimeout(
         // `true` = reject when the pairing dialog is closed, so closing it is an
         // answer ("rejected") instead of a wait that only the timeout ends.
@@ -452,7 +458,7 @@ export async function connect(kind: WalletKind, options: ConnectOptions = {}): P
       const link = await walletLink(kind, config.walletConnectProjectId, options.fetchImpl ?? fetch)
       const target = isMobileWalletTarget(options.userAgent)
       if (link && target) {
-        options.onRoute?.('deep-link')
+        note('deep-link')
         await withTimeout(
           instance.connect((uri) => {
             options.onPairing?.(uri)
@@ -462,7 +468,7 @@ export async function connect(kind: WalletKind, options: ConnectOptions = {}): P
             // pairing code for the same URI instead of a dead end.
             setTimeout(() => {
               if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
-              options.onRoute?.('dialog')
+              note('dialog')
               instance.walletConnectModal.openModal({ uri })
             }, APP_OPEN_GRACE_MS)
           }),
@@ -472,7 +478,7 @@ export async function connect(kind: WalletKind, options: ConnectOptions = {}): P
       } else {
         // 3. …and on a desktop without the extension, the pairing dialog is the
         // only path left: it shows the code the wallet pastes or scans.
-        options.onRoute?.('dialog')
+        note('dialog')
         await withTimeout(
           instance.openModal(undefined, true),
           CONNECT_TIMEOUT_MS,
@@ -494,6 +500,9 @@ export async function connect(kind: WalletKind, options: ConnectOptions = {}): P
       `The wallet connected without a Hedera account on ${config.network}.`,
     )
   }
+  // Any road counts: a phone has no extension, and its reload still has to know
+  // that this browser may read a session back.
+  rememberWallet(kind, route)
   return session
 }
 
@@ -508,25 +517,34 @@ export async function disconnect(): Promise<void> {
 
 /**
  * The one thing this page keeps in the browser: which wallet kind this
- * browser last connected with through an extension. It is not a session and
- * not a key — it only tells a reload that this browser has connected before,
- * so it may quietly read the session back instead of asking anyone.
+ * browser last connected with, and by which road (`hashpack:deep-link`). It is
+ * not a session and not a key — it only tells a reload that this browser has
+ * connected before, so it may quietly read the session back instead of asking
+ * anyone. Older values are a bare kind, which meant an extension.
  */
 const EXTENSION_MARKER_KEY = 'treasury.wallet.extension'
 
-export function rememberedExtension(): WalletKind | null {
+function readMarker(): string | null {
   if (typeof localStorage === 'undefined') return null
   try {
-    const value = localStorage.getItem(EXTENSION_MARKER_KEY)
-    return value === 'hashpack' || value === 'kabila' ? value : null
+    return localStorage.getItem(EXTENSION_MARKER_KEY)
   } catch {
     return null
   }
 }
 
-function rememberExtension(kind: WalletKind): void {
+/** The extension that connected, if that is how this browser last did it. */
+export function rememberedExtension(): WalletKind | null {
+  const value = readMarker()
+  if (!value) return null
+  const [kind, road = 'extension'] = value.split(':')
+  if (road !== 'extension') return null
+  return kind === 'hashpack' || kind === 'kabila' ? kind : null
+}
+
+function rememberWallet(kind: WalletKind, route: ConnectRoute): void {
   try {
-    localStorage.setItem(EXTENSION_MARKER_KEY, kind)
+    localStorage.setItem(EXTENSION_MARKER_KEY, `${kind}:${route}`)
   } catch {
     // Private mode or a full quota: the reload simply will not restore.
   }
@@ -540,9 +558,9 @@ function forgetExtension(): void {
   }
 }
 
-/** Whether this browser has ever connected through an extension. */
+/** Whether this browser has connected before, by any road. */
 export function hasConnectedBefore(): boolean {
-  return rememberedExtension() !== null
+  return readMarker() !== null
 }
 
 /**
@@ -570,6 +588,71 @@ export async function restore(options: { waitMs?: number } = {}): Promise<Wallet
   } catch {
     return null
   }
+}
+
+/**
+ * Watch for a session that shows up *after* the page is already up.
+ *
+ * On a phone the wallet's approval often reaches the relay after the page has
+ * loaded — the client reconnects, the settle arrives, and the signer exists a
+ * second or two later. A page that checked once would sit on "Connect" while
+ * the session was already there, which is why a click used to make it appear
+ * instantly. This keeps looking, and stops at the first session.
+ */
+export function pollForSession(
+  read: () => WalletSession | null,
+  onSession: (session: WalletSession) => void,
+  options: { budgetMs?: number; intervalMs?: number } = {},
+): () => void {
+  const budgetMs = options.budgetMs ?? 60_000
+  const intervalMs = options.intervalMs ?? 1_000
+  const started = Date.now()
+  let stopped = false
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  const tick = (): void => {
+    if (stopped) return
+    const session = read()
+    if (session) {
+      stopped = true
+      onSession(session)
+      return
+    }
+    if (Date.now() - started >= budgetMs) return
+    timer = setTimeout(tick, intervalMs)
+  }
+
+  timer = setTimeout(tick, intervalMs)
+  return () => {
+    stopped = true
+    if (timer) clearTimeout(timer)
+  }
+}
+
+/** The same watch, over the real connector. */
+export function watchSession(
+  onSession: (session: WalletSession) => void,
+  options: { budgetMs?: number; intervalMs?: number } = {},
+): () => void {
+  let instance: DAppConnector | null = null
+  let priming = false
+  return pollForSession(
+    () => {
+      if (!instance && !priming) {
+        priming = true
+        void connector()
+          .then((created) => {
+            instance = created
+          })
+          .catch(() => {
+            // A connector that will not start simply means no session yet.
+          })
+      }
+      return instance ? sessionOf(instance) : null
+    },
+    onSession,
+    options,
+  )
 }
 
 /** Test seam: drop the cached connector between cases. */
