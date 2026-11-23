@@ -14,7 +14,7 @@ import { HASHSCAN_BASE, MIRROR_BASE, normalizeAccountId, type HederaNetwork } fr
 export const DEFAULT_NETWORK: HederaNetwork = 'mainnet'
 
 /** The configured admin: the only account layer 3a lets create treasuries. */
-export const DEFAULT_ADMIN_ACCOUNT = '0.0.10964527'
+export const DEFAULT_ADMIN_ACCOUNT = '0.0.10964435'
 
 const read = (key: string): string => {
   const value = import.meta.env[key]

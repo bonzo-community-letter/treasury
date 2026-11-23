@@ -57,3 +57,20 @@ body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/*
+ * Anything clickable shows it. The browser's default cursor for a button is
+ * an arrow, which makes every control here look inert; the dialog backdrops
+ * opt out with `cursor-default`.
+ */
+button:not(:disabled):not(.cursor-default),
+[role='button']:not(:disabled):not(.cursor-default),
+summary,
+select {
+  cursor: pointer;
+}
+
+button:disabled,
+[role='button'][aria-disabled='true'] {
+  cursor: not-allowed;
+}

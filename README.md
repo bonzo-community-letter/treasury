@@ -54,12 +54,12 @@ Copy `.env.example` to `.env.local` (gitignored) and fill in:
 
 ```
 VITE_HEDERA_NETWORK=mainnet          # mainnet | testnet (a typo throws at load)
-VITE_ADMIN_ACCOUNT=0.0.10964527      # the only account allowed to create treasuries
+VITE_ADMIN_ACCOUNT=0.0.10964435      # the only account allowed to create treasuries
 VITE_TREASURY_ACCOUNTS=              # pinned treasury id(s); when set, configure instead of create
 VITE_WALLETCONNECT_PROJECT_ID=       # WalletConnect Cloud project id
 ```
 
-Defaults in code: mainnet, admin `0.0.10964527`, treasury list empty.
+Defaults in code: mainnet, admin `0.0.10964435`, treasury list empty.
 `VITE_WALLETCONNECT_PROJECT_ID` is not a secret (it ships in the bundle) but
 belongs in `.env.local` locally and in **repository variables** for CI — never
 in the repo. Never put a private key or any Hedera account secret in any of
