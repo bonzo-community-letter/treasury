@@ -11,7 +11,8 @@ import {
   parseHbarAmount,
   parseTransferAmount,
   thresholdHelper,
-  validateExpiryMinutes,
+  validateExpiry,
+  hbarFromTinybarsForInput,
   validateMemo,
   validateThreshold,
 } from './treasury'
@@ -97,17 +98,18 @@ describe('validateMemo', () => {
   })
 })
 
-describe('validateExpiryMinutes', () => {
+describe('validateExpiry', () => {
+  const now = 1_700_000_000
   it('accepts 1 minute up to the 62-day protocol maximum', () => {
-    expect(validateExpiryMinutes(30)).toEqual({ ok: true, value: 30 })
-    expect(validateExpiryMinutes(62 * 24 * 60)).toEqual({ ok: true, value: 62 * 24 * 60 })
-    const none = validateExpiryMinutes(0)
-    if (!none.ok) expect(none.error).toMatch(/at least a minute/)
-    const beyond = validateExpiryMinutes(62 * 24 * 60 + 1)
+    expect(validateExpiry(now + 1800, now)).toEqual({ ok: true, value: now + 1800 })
+    expect(validateExpiry(now + 62 * 24 * 60 * 60, now)).toEqual({ ok: true, value: now + 62 * 24 * 60 * 60 })
+    const none = validateExpiry(now, now)
+    if (!none.ok) expect(none.error).toMatch(/in the future/)
+    const beyond = validateExpiry(now + 62 * 24 * 60 * 60 + 1, now)
     expect(beyond.ok).toBe(false)
     if (!beyond.ok) expect(beyond.error).toMatch(/62 days at most/)
-    const half = validateExpiryMinutes(1.5)
-    if (!half.ok) expect(half.error).toMatch(/whole number/)
+    const half = validateExpiry(now + 90.5, now)
+    if (!half.ok) expect(half.error).toMatch(/date and time/)
   })
 })
 
@@ -218,25 +220,60 @@ describe('buildTransferPlan', () => {
 })
 
 describe('buildSchedulePlan', () => {
-  it('builds the M-of-N schedule plan and names the memo after the recipient', () => {
-    const built = buildSchedulePlan('mainnet', '0.0.4486', '0.0.51', '9', '', 30)
+  const now = 1_700_000_000
+  const base = {
+    network: 'mainnet' as const,
+    treasuryAccountId: '0.0.4486',
+    recipient: '0.0.51',
+    hbar: '9',
+    memo: '',
+    expirySec: now + 1800,
+    waitForExpiry: false,
+    nowSec: now,
+  }
+
+  it('builds the schedule plan and names the memo after the recipient', () => {
+    const built = buildSchedulePlan(base)
     expect(built.ok).toBe(true)
     if (built.ok) {
       expect(built.plan.kind).toBe('scheduleCreate')
       expect(built.plan.amountTinybars).toBe('900000000')
-      expect(built.plan.expiryMinutes).toBe(30)
+      expect(built.plan.expirySec).toBe(now + 1800)
+      expect(built.plan.waitForExpiry).toBe(false)
       expect(built.plan.memo).toBe(defaultScheduleMemo('0.0.51'))
     }
   })
 
+  it('carries wait-for-expiry through to the plan', () => {
+    const built = buildSchedulePlan({ ...base, waitForExpiry: true })
+    expect(built.ok && built.plan.waitForExpiry).toBe(true)
+  })
+
   it('keeps an explicit memo when the signer typed one', () => {
-    const built = buildSchedulePlan('mainnet', '0.0.4486', '0.0.51', '1', 'rent for March', 1440)
+    const built = buildSchedulePlan({ ...base, hbar: '1', memo: 'rent for March' })
     expect(built.ok && built.plan.memo).toBe('rent for March')
   })
 
-  it('refuses an expiry outside the protocol window', () => {
-    expect(buildSchedulePlan('mainnet', '0.0.4486', '0.0.51', '1', '', 0).ok).toBe(false)
-    expect(buildSchedulePlan('mainnet', '0.0.4486', '0.0.51', '1', '', 62 * 24 * 60 + 1).ok).toBe(false)
+  it('refuses an expiry in the past or beyond the protocol window', () => {
+    expect(buildSchedulePlan({ ...base, expirySec: now }).ok).toBe(false)
+    expect(buildSchedulePlan({ ...base, expirySec: now + 62 * 24 * 60 * 60 + 1 }).ok).toBe(false)
+    expect(buildSchedulePlan({ ...base, expirySec: Number.NaN }).ok).toBe(false)
+  })
+})
+
+describe('hbarFromTinybarsForInput', () => {
+  it('floors to the form\'s five decimals', () => {
+    expect(hbarFromTinybarsForInput(1_589_618_519n)).toBe('15.89618')
+    expect(hbarFromTinybarsForInput(500_000_000n)).toBe('5')
+    expect(hbarFromTinybarsForInput(1_000n)).toBe('0.00001')
+    expect(hbarFromTinybarsForInput(999n)).toBe('0')
+    expect(hbarFromTinybarsForInput(0n)).toBe('0')
+  })
+
+  it('never asks for more than the balance holds', () => {
+    const balance = 12_345_678n
+    const text = hbarFromTinybarsForInput(balance)
+    expect(BigInt(Math.round(Number(text) * 1e5))).toBeLessThanOrEqual(balance / 1_000n)
   })
 })
 

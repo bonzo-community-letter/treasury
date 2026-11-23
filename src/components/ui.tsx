@@ -126,3 +126,46 @@ export function StatusBadge({
     </span>
   )
 }
+
+/** A square switch in the family's line weight: a track, a block, the accent when on. */
+export function Switch({
+  checked,
+  onChange,
+  disabled,
+  label,
+  note,
+}: {
+  checked: boolean
+  onChange: (next: boolean) => void
+  disabled?: boolean
+  label: string
+  note?: string
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className="flex w-full items-start gap-3 text-left disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      <span
+        aria-hidden="true"
+        className={`mt-0.5 flex h-4 w-8 shrink-0 items-center border transition-colors ${
+          checked ? 'border-accent bg-accent/15' : 'border-rule bg-page'
+        }`}
+      >
+        <span
+          className={`h-3 w-3 transition-all ${checked ? 'ml-[1.05rem] bg-accent' : 'ml-0.5 bg-ink-faint'}`}
+        />
+      </span>
+      <span>
+        <span className="block text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-ink-soft">
+          {label}
+        </span>
+        {note ? <span className="mt-1 block text-xs leading-relaxed text-ink-faint">{note}</span> : null}
+      </span>
+    </button>
+  )
+}

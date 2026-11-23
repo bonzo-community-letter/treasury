@@ -373,14 +373,21 @@ export const SCHEDULE_EXPIRY_OPTIONS = [
 
 export const SCHEDULE_EXPIRY_DEFAULT_MINUTES = 30
 export const SCHEDULE_EXPIRY_MAX_MINUTES = 62 * 24 * 60
+export const SCHEDULE_EXPIRY_MAX_SECONDS = SCHEDULE_EXPIRY_MAX_MINUTES * 60
 
-export function validateExpiryMinutes(minutes: number): Validated<number> {
-  if (!Number.isInteger(minutes)) return { ok: false, error: 'The expiry must be a whole number of minutes.' }
-  if (minutes < 1) return { ok: false, error: 'The schedule must wait at least a minute.' }
-  if (minutes > SCHEDULE_EXPIRY_MAX_MINUTES) {
+/**
+ * The expiry as an absolute moment: after now (the network refuses a schedule
+ * that is born expired) and inside the protocol's 62-day window.
+ */
+export function validateExpiry(expirySec: number, nowSec: number): Validated<number> {
+  if (!Number.isFinite(expirySec) || !Number.isInteger(expirySec)) {
+    return { ok: false, error: 'Choose a date and time for the expiry.' }
+  }
+  if (expirySec <= nowSec) return { ok: false, error: 'The expiry must be in the future.' }
+  if (expirySec > nowSec + SCHEDULE_EXPIRY_MAX_SECONDS) {
     return { ok: false, error: `The network expires schedules after ${SCHEDULE_EXPIRY_MAX_MINUTES / (24 * 60)} days at most.` }
   }
-  return { ok: true, value: minutes }
+  return { ok: true, value: expirySec }
 }
 
 /** An M-of-N path: the schedule that waits for the other signatures. */
@@ -391,8 +398,25 @@ export interface SchedulePlan {
   readonly recipientAccountId: string
   readonly amountTinybars: string
   readonly memo: string
-  readonly expiryMinutes: number
+  /** absolute moment the network stops waiting, epoch seconds */
+  readonly expirySec: number
+  /** true: run at the expiry even when the threshold signed earlier */
+  readonly waitForExpiry: boolean
   readonly maxFeeTinybars: string
+}
+
+export interface ScheduleInput {
+  network: HederaNetwork
+  treasuryAccountId: string
+  recipient: string
+  hbar: string
+  memo: string
+  /** absolute expiry, epoch seconds */
+  expirySec: number
+  waitForExpiry: boolean
+  maxFeeHbar?: string
+  /** the clock the expiry is judged against; a parameter so the plan stays pure */
+  nowSec?: number
 }
 
 /**
@@ -404,43 +428,39 @@ export function defaultScheduleMemo(recipient: string): string {
 }
 
 export function buildSchedulePlan(
-  network: HederaNetwork,
-  treasuryAccountId: string,
-  recipient: string,
-  hbar: string,
-  memo: string,
-  expiryMinutes: number,
-  maxFeeHbar: string = DEFAULT_MAX_FEE_HBAR,
+  input: ScheduleInput,
 ): { ok: true; plan: SchedulePlan } | { ok: false; errors: string[] } {
   const errors: string[] = []
+  const nowSec = input.nowSec ?? Math.floor(Date.now() / 1000)
 
   let recipientId = ''
-  const recipientCheck = validateAccountId(recipient, 'Recipient')
+  const recipientCheck = validateAccountId(input.recipient, 'Recipient')
   if (recipientCheck.ok) recipientId = recipientCheck.value
   else errors.push(recipientCheck.error)
 
   let amountTinybars = ''
-  const amount = parseTransferAmount(hbar, 'Amount')
+  const amount = parseTransferAmount(input.hbar, 'Amount')
   if (amount.ok) amountTinybars = amount.value
   else errors.push(amount.error)
 
-  const memoSource = memo.trim().length > 0 ? memo : recipientId ? defaultScheduleMemo(recipientId) : ''
+  const memoSource =
+    input.memo.trim().length > 0 ? input.memo : recipientId ? defaultScheduleMemo(recipientId) : ''
   let memoValue = ''
   const scheduleMemo = validateMemo(memoSource)
   if (scheduleMemo.ok) memoValue = scheduleMemo.value
   else errors.push(scheduleMemo.error)
 
-  let expiry = SCHEDULE_EXPIRY_DEFAULT_MINUTES
-  const expiryCheck = validateExpiryMinutes(expiryMinutes)
-  if (expiryCheck.ok) expiry = expiryCheck.value
+  let expirySec = 0
+  const expiryCheck = validateExpiry(input.expirySec, nowSec)
+  if (expiryCheck.ok) expirySec = expiryCheck.value
   else errors.push(expiryCheck.error)
 
   let feeTinybars = ''
-  const fee = parseHbarAmount(maxFeeHbar, 'Max fee')
+  const fee = parseHbarAmount(input.maxFeeHbar ?? DEFAULT_MAX_FEE_HBAR, 'Max fee')
   if (fee.ok) feeTinybars = fee.value
   else errors.push(fee.error)
 
-  if (recipientId && recipientId === treasuryAccountId) {
+  if (recipientId && recipientId === input.treasuryAccountId) {
     errors.push('The recipient is the treasury itself — that moves nothing.')
   }
 
@@ -449,12 +469,13 @@ export function buildSchedulePlan(
     ok: true,
     plan: {
       kind: 'scheduleCreate',
-      network,
-      treasuryAccountId,
+      network: input.network,
+      treasuryAccountId: input.treasuryAccountId,
       recipientAccountId: recipientId,
       amountTinybars,
       memo: memoValue,
-      expiryMinutes: expiry,
+      expirySec,
+      waitForExpiry: input.waitForExpiry,
       maxFeeTinybars: feeTinybars,
     },
   }
@@ -471,4 +492,18 @@ export function formatHbar(tinybars: string | bigint): string {
   // 8 decimals: a tinybar is 0.00000001 HBAR, whatever the input allowed.
   const trimmed = fraction.toString().padStart(8, '0').replace(/0+$/, '')
   return `${sign}${whole.toString()}.${trimmed} HBAR`
+}
+
+/**
+ * The "Max" amount: the whole balance, floored to the form's five decimals.
+ * Flooring matters — a rounded-up maximum would exceed the balance, and the
+ * dust it leaves is at most 0.00001 HBAR.
+ */
+export function hbarFromTinybarsForInput(tinybars: bigint): string {
+  if (tinybars <= 0n) return '0'
+  const perStep = TINYBARS_PER_HBAR / 100_000n // one 1e-5 HBAR step, in tinybars
+  const steps = tinybars / perStep
+  const whole = steps / 100_000n
+  const fraction = (steps % 100_000n).toString().padStart(5, '0').replace(/0+$/, '')
+  return fraction.length > 0 ? `${whole}.${fraction}` : `${whole}`
 }

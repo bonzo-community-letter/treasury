@@ -198,6 +198,7 @@ export function App() {
                 structure={treasuryKey.structure}
                 connectedAccountId={wallet.accountId as string}
                 connectedKeyRaw={walletKey.singleRaw}
+                balanceTinybars={snapshot.account?.balanceTinybars ?? null}
               />
             ) : (
               <section className="border border-rule bg-hero px-5 py-6 sm:px-8 sm:py-8">

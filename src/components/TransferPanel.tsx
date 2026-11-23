@@ -4,8 +4,8 @@ import { hashscanScheduleUrl, hashscanTransactionUrl } from '../lib/hedera'
 import {
   buildSchedulePlan,
   buildTransferPlan,
+  hbarFromTinybarsForInput,
   SCHEDULE_EXPIRY_DEFAULT_MINUTES,
-  SCHEDULE_EXPIRY_OPTIONS,
 } from '../lib/treasury'
 import {
   createScheduledTransfer,
@@ -15,45 +15,68 @@ import {
 } from '../lib/transfer'
 import type { TreasuryKeyStructure } from '../lib/accountKey'
 import { structureHasRaw } from '../lib/accountKey'
-import { ErrorNote, FieldLabel, inputClass, Note, Panel, primaryAction } from './ui'
+import { ErrorNote, FieldLabel, inputClass, Note, Panel, primaryAction, Switch } from './ui'
 
 interface Props {
   treasuryId: string
   structure: TreasuryKeyStructure
   connectedAccountId: string
   connectedKeyRaw: string | null
+  /** the treasury's balance, for the Max button */
+  balanceTinybars: bigint | null
 }
 
 type Phase = 'form' | 'submitting' | 'receipt' | 'done'
 
+/** `datetime-local` wants `YYYY-MM-DDTHH:mm` in the browser's own zone. */
+function toLocalInputValue(date: Date): string {
+  const pad = (value: number): string => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function defaultExpiryInput(): string {
+  return toLocalInputValue(new Date(Date.now() + SCHEDULE_EXPIRY_DEFAULT_MINUTES * 60_000))
+}
+
 /**
- * Layer 3b — move HBAR out of the treasury. The branch is decided by what
- * the chain says the treasury's key is, not by a toggle:
+ * Layer 3b — move HBAR out of the treasury.
  *
- *   threshold 1   a normal CryptoTransfer, paid and signed by this wallet
- *                 in one step — its key satisfies the 1-of-N;
- *   threshold m>1 a ScheduleCreate wrapping the same transfer. The inner
- *                 transfer carries no transaction id: the network assigns
- *                 one at execution and the inner fee payer defaults to the
- *                 creator, which keeps the ScheduleCreate signable by this
- *                 one wallet. The other signatures arrive as ScheduleSign
- *                 transactions from the other signers — see the pending
- *                 panel. Functionally the LimeChain hedera-multisig pattern.
+ * A transfer at a threshold of 1 is a plain CryptoTransfer: one signature,
+ * the wallet pays. Anything above 1 is a schedule, and so is a 1-of-N
+ * transfer when the signer asks for one — the same ScheduleCreate either way,
+ * with the expiry chosen in the form and an optional "wait for expiry".
+ *
+ * The scheduled transfer carries no transaction id: the network assigns one
+ * at execution and the inner fee payer defaults to the creator, which keeps
+ * the ScheduleCreate signable by this one wallet. The other signatures arrive
+ * as ScheduleSign transactions from the other signers.
  *
  * The preflight here is a courtesy (UI gating is cosmetic): the chain is the
  * one that decides whose key counts.
  */
-export function TransferPanel({ treasuryId, structure, connectedAccountId, connectedKeyRaw }: Props) {
+export function TransferPanel({
+  treasuryId,
+  structure,
+  connectedAccountId,
+  connectedKeyRaw,
+  balanceTinybars,
+}: Props) {
   const [recipient, setRecipient] = useState('')
   const [amount, setAmount] = useState('')
   const [memo, setMemo] = useState('')
-  const [expiryMinutes, setExpiryMinutes] = useState(String(SCHEDULE_EXPIRY_DEFAULT_MINUTES))
+  const [scheduledOn, setScheduledOn] = useState(false)
+  const [expiryInput, setExpiryInput] = useState(defaultExpiryInput)
+  const [waitForExpiry, setWaitForExpiry] = useState(false)
   const [errors, setErrors] = useState<string[]>([])
   const [phase, setPhase] = useState<Phase>('form')
   const [outcome, setOutcome] = useState<SubmitOutcome | null>(null)
   const [scheduleId, setScheduleId] = useState<string | null>(null)
 
-  const scheduled = structure.threshold > 1
+  // Above 1 of N a direct transfer is not possible — the schedule is the only
+  // path, so the switch is on and locked.
+  const mustSchedule = structure.threshold > 1
+  const scheduled = mustSchedule || scheduledOn
+
   const holdsKey = structureHasRaw(structure, connectedKeyRaw)
   // A session on the treasury account itself (its key acting through its own
   // threshold) is also allowed to ask; for threshold > 1 it will simply find
@@ -61,13 +84,27 @@ export function TransferPanel({ treasuryId, structure, connectedAccountId, conne
   const isTreasurySession = connectedAccountId === treasuryId
   const preflightOk = holdsKey || isTreasurySession
 
+  const fillMax = (): void => {
+    if (balanceTinybars === null) return
+    setAmount(hbarFromTinybarsForInput(balanceTinybars))
+  }
+
   const submit = async (): Promise<void> => {
     setErrors([])
     setOutcome(null)
     setScheduleId(null)
 
     if (scheduled) {
-      const built = buildSchedulePlan(config.network, treasuryId, recipient, amount, memo, Number(expiryMinutes))
+      const expirySec = expiryInput.length > 0 ? Math.floor(new Date(expiryInput).getTime() / 1000) : Number.NaN
+      const built = buildSchedulePlan({
+        network: config.network,
+        treasuryAccountId: treasuryId,
+        recipient,
+        hbar: amount,
+        memo,
+        expirySec,
+        waitForExpiry,
+      })
       if (!built.ok) {
         setErrors(built.errors)
         return
@@ -81,7 +118,11 @@ export function TransferPanel({ treasuryId, structure, connectedAccountId, conne
         setOutcome(result)
         setScheduleId(result.scheduleId)
       } catch (error) {
-        setOutcome({ kind: 'failed', transactionId: '', status: error instanceof Error ? error.message : 'The request failed.' })
+        setOutcome({
+          kind: 'failed',
+          transactionId: '',
+          status: error instanceof Error ? error.message : 'The request failed.',
+        })
       }
     } else {
       const built = buildTransferPlan(config.network, treasuryId, recipient, amount, memo)
@@ -97,7 +138,11 @@ export function TransferPanel({ treasuryId, structure, connectedAccountId, conne
         })
         setOutcome(result)
       } catch (error) {
-        setOutcome({ kind: 'failed', transactionId: '', status: error instanceof Error ? error.message : 'The request failed.' })
+        setOutcome({
+          kind: 'failed',
+          transactionId: '',
+          status: error instanceof Error ? error.message : 'The request failed.',
+        })
       }
     }
     setPhase('done')
@@ -125,7 +170,14 @@ export function TransferPanel({ treasuryId, structure, connectedAccountId, conne
       {phase === 'done' && outcome ? (
         <div className="space-y-3">
           <OutcomeLine outcome={outcome} scheduled={scheduled} scheduleId={scheduleId} />
-          <button type="button" className={primaryAction} onClick={() => { setPhase('form'); setOutcome(null) }}>
+          <button
+            type="button"
+            className={primaryAction}
+            onClick={() => {
+              setPhase('form')
+              setOutcome(null)
+            }}
+          >
             Another transfer
           </button>
         </div>
@@ -143,7 +195,23 @@ export function TransferPanel({ treasuryId, structure, connectedAccountId, conne
             </label>
             <label className="block">
               <FieldLabel>Amount, HBAR</FieldLabel>
-              <input className={inputClass} value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="0.00" />
+              <div className="relative">
+                <input
+                  className={`${inputClass} pr-16`}
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                  placeholder="0.00"
+                />
+                <button
+                  type="button"
+                  onClick={fillMax}
+                  disabled={balanceTinybars === null}
+                  title="Fill in the whole balance"
+                  className="absolute top-1/2 right-1.5 -translate-y-1/2 rounded-sm border border-rule px-2 py-1 text-[0.5625rem] font-semibold uppercase tracking-[0.14em] text-ink-soft transition-colors hover:border-accent hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  Max
+                </button>
+              </div>
             </label>
           </div>
 
@@ -152,25 +220,42 @@ export function TransferPanel({ treasuryId, structure, connectedAccountId, conne
             <input className={inputClass} value={memo} onChange={(event) => setMemo(event.target.value)} />
           </label>
 
+          <Switch
+            checked={scheduled}
+            onChange={setScheduledOn}
+            disabled={mustSchedule}
+            label="Scheduled"
+            note={
+              mustSchedule
+                ? `This treasury needs ${structure.threshold} of ${structure.keys.length} signatures, so every transfer is scheduled.`
+                : 'Collects signatures first and lets the network execute it when the threshold is reached.'
+            }
+          />
+
           {scheduled ? (
-            <label className="block">
-              <FieldLabel>Wait for signatures</FieldLabel>
-              <select
-                className={inputClass}
-                value={expiryMinutes}
-                onChange={(event) => setExpiryMinutes(event.target.value)}
-              >
-                {SCHEDULE_EXPIRY_OPTIONS.map((option) => (
-                  <option key={option.minutes} value={String(option.minutes)}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <p className="mt-2 text-xs leading-relaxed text-ink-faint">
-                The schedule expires if the {structure.threshold} of {structure.keys.length}{' '}
-                signatures are not collected in time.
-              </p>
-            </label>
+            <div className="grid gap-5 sm:grid-cols-2">
+              <label className="block">
+                <FieldLabel>Expires</FieldLabel>
+                <input
+                  type="datetime-local"
+                  className={inputClass}
+                  value={expiryInput}
+                  onChange={(event) => setExpiryInput(event.target.value)}
+                />
+                <p className="mt-2 text-xs leading-relaxed text-ink-faint">
+                  The network drops the schedule if the signatures are not collected by then (62
+                  days at most).
+                </p>
+              </label>
+              <div className="sm:pt-6">
+                <Switch
+                  checked={waitForExpiry}
+                  onChange={setWaitForExpiry}
+                  label="Wait for expiry"
+                  note="Runs at that time even if the threshold signed earlier."
+                />
+              </div>
+            </div>
           ) : null}
 
           {errors.length > 0 ? (
@@ -198,13 +283,15 @@ export function TransferPanel({ treasuryId, structure, connectedAccountId, conne
                     ? 'Create the schedule'
                     : 'Send the transfer'}
             </button>
-            <span className="text-xs text-ink-faint">Fee payer: <span className="font-mono">{connectedAccountId}</span></span>
+            <span className="text-xs text-ink-faint">
+              Fee payer: <span className="font-mono">{connectedAccountId}</span>
+            </span>
           </div>
 
           {scheduled ? (
             <Note>
-              The other signers sign it under Scheduled transfers. The network executes it when
-              the threshold is reached, or the schedule expires.
+              The other signers sign it under Scheduled transfers. The network executes it when the
+              threshold is reached, or the schedule expires.
             </Note>
           ) : null}
         </div>
@@ -213,7 +300,15 @@ export function TransferPanel({ treasuryId, structure, connectedAccountId, conne
   )
 }
 
-function OutcomeLine({ outcome, scheduled, scheduleId }: { outcome: SubmitOutcome; scheduled: boolean; scheduleId: string | null }) {
+function OutcomeLine({
+  outcome,
+  scheduled,
+  scheduleId,
+}: {
+  outcome: SubmitOutcome
+  scheduled: boolean
+  scheduleId: string | null
+}) {
   if (outcome.kind === 'failed') {
     return (
       <ErrorNote>
@@ -224,9 +319,13 @@ function OutcomeLine({ outcome, scheduled, scheduleId }: { outcome: SubmitOutcom
   if (outcome.kind === 'unverified') {
     return (
       <Note>
-        The wallet answered; the mirror has not indexed the transaction yet. Check the
-        explorer.{' '}
-        <a href={hashscanTransactionUrl(config.network, outcome.transactionId)} target="_blank" rel="noreferrer" className="underline decoration-rule underline-offset-4 hover:decoration-accent">
+        The wallet answered; the mirror has not indexed the transaction yet. Check the explorer.{' '}
+        <a
+          href={hashscanTransactionUrl(config.network, outcome.transactionId)}
+          target="_blank"
+          rel="noreferrer"
+          className="underline decoration-rule underline-offset-4 hover:decoration-accent"
+        >
           HashScan
         </a>
       </Note>
@@ -236,7 +335,12 @@ function OutcomeLine({ outcome, scheduled, scheduleId }: { outcome: SubmitOutcom
     return (
       <p className="text-sm text-ink-soft">
         Schedule <span className="font-mono text-ink">{scheduleId}</span> created ({outcome.status}).{' '}
-        <a href={hashscanScheduleUrl(config.network, scheduleId)} target="_blank" rel="noreferrer" className="underline decoration-rule underline-offset-4 hover:decoration-accent">
+        <a
+          href={hashscanScheduleUrl(config.network, scheduleId)}
+          target="_blank"
+          rel="noreferrer"
+          className="underline decoration-rule underline-offset-4 hover:decoration-accent"
+        >
           HashScan
         </a>
       </p>
@@ -245,7 +349,12 @@ function OutcomeLine({ outcome, scheduled, scheduleId }: { outcome: SubmitOutcom
   return (
     <p className="text-sm text-ink-soft">
       {outcome.status}.{outcome.entityId ? ` Entity ${outcome.entityId}.` : ''}{' '}
-      <a href={hashscanTransactionUrl(config.network, outcome.transactionId)} target="_blank" rel="noreferrer" className="underline decoration-rule underline-offset-4 hover:decoration-accent">
+      <a
+        href={hashscanTransactionUrl(config.network, outcome.transactionId)}
+        target="_blank"
+        rel="noreferrer"
+        className="underline decoration-rule underline-offset-4 hover:decoration-accent"
+      >
         HashScan
       </a>
     </p>

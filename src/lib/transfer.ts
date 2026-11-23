@@ -151,7 +151,6 @@ export type ScheduleSubmitOutcome = SubmitOutcome & {
 export async function createScheduledTransfer(
   plan: SchedulePlan,
   stages: SubmitStages = {},
-  nowSec: number = Math.floor(Date.now() / 1000),
 ): Promise<ScheduleSubmitOutcome> {
   assertPlanNetwork(plan)
   const { outcome } = await submitThroughWallet((sdk, sessionAccount) => {
@@ -164,7 +163,8 @@ export async function createScheduledTransfer(
     const schedule = new sdk.ScheduleCreateTransaction()
       .setScheduledTransaction(inner)
       .setScheduleMemo(plan.memo)
-      .setExpirationTime(sdk.Timestamp.fromDate(new Date((nowSec + plan.expiryMinutes * 60) * 1000)))
+      .setExpirationTime(sdk.Timestamp.fromDate(new Date(plan.expirySec * 1000)))
+      .setWaitForExpiry(plan.waitForExpiry)
       .setMaxTransactionFee(sdk.Hbar.fromTinybars(plan.maxFeeTinybars))
       .setTransactionId(sdk.TransactionId.generate(sdk.AccountId.fromString(sessionAccount)))
     schedule.freezeWith(sdk.Client.forName(plan.network))
