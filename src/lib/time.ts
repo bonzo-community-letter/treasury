@@ -49,3 +49,40 @@ export function countdown(expirySec: number | null, nowSec: number): string {
   if (minutes >= 1) return `in ${minutes} min ${String(seconds).padStart(2, '0')} s`
   return 'any moment now'
 }
+
+/**
+ * Strict chronological comparison of two mirror timestamps, as strings —
+ * `seconds.nanoseconds`, so the nanoseconds decide ties and a plain string
+ * compare would be wrong the moment the digits differ in length.
+ * Negative when `a` is older, positive when it is newer, 0 when equal;
+ * an unknown timestamp sorts last.
+ */
+export function compareTimestamps(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): number {
+  if (!a && !b) return 0
+  if (!a) return 1
+  if (!b) return -1
+  if (a === b) return 0
+  const [aSec, aNano] = partsOf(a)
+  const [bSec, bNano] = partsOf(b)
+  if (aSec !== bSec) return aSec > bSec ? 1 : -1
+  if (aNano !== bNano) return aNano > bNano ? 1 : -1
+  return 0
+}
+
+/** `1795378893.593108104` → [seconds, nanoseconds]; junk reads as zero. */
+function partsOf(timestamp: string): [bigint, bigint] {
+  const [seconds = '', nanos = ''] = timestamp.split('.')
+  try {
+    return [BigInt(seconds.trim() || '0'), BigInt(nanos.padEnd(9, '0').slice(0, 9) || '0')]
+  } catch {
+    return [0n, 0n]
+  }
+}
+
+/** Newest first — the order both lists are read in. */
+export function newestFirst<T>(pick: (item: T) => string | null | undefined) {
+  return (a: T, b: T): number => compareTimestamps(pick(b), pick(a))
+}

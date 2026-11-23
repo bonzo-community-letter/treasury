@@ -74,3 +74,22 @@ button:disabled,
 [role='button'][aria-disabled='true'] {
   cursor: not-allowed;
 }
+
+/*
+ * The native date picker draws a black glyph, which disappears on this page.
+ * `color-scheme: dark` makes the browser draw it light; the filter tints it
+ * with the accent so it sits in the same family as the rest of the controls.
+ */
+input[type='datetime-local'] {
+  color-scheme: dark;
+}
+
+input[type='datetime-local']::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  opacity: 0.9;
+  filter: sepia(1) saturate(4) hue-rotate(-18deg) brightness(1.05);
+}
+
+input[type='datetime-local']::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}

@@ -3,7 +3,7 @@ import { config } from '../config'
 import { hashscanScheduleUrl } from '../lib/hedera'
 import { fingerprint } from '../lib/keys'
 import { formatHbar } from '../lib/treasury'
-import { countdown, secondsOfTimestamp, shortDateTime } from '../lib/time'
+import { countdown, newestFirst, secondsOfTimestamp, shortDateTime } from '../lib/time'
 import { hasKeySigned, scheduleView, type PendingScheduleView } from '../lib/schedule'
 import type { TreasuryKeyStructure } from '../lib/accountKey'
 import type { MirrorSchedule } from '../lib/mirror'
@@ -87,11 +87,13 @@ export function SchedulesPanel({
   const views = schedules
     .map((schedule) => scheduleView(schedule, treasuryId, structure, nowSec))
     .filter((view): view is PendingScheduleView => view !== null)
-    .sort((a, b) => (b.schedule.executedTimestamp === null ? 1 : 0) - (a.schedule.executedTimestamp === null ? 1 : 0))
+    // Strictly newest first by the time the row prints, never grouped by
+    // status: a list that reorders itself when a schedule executes is one you
+    // cannot scan.
+    .sort(newestFirst((view) => view.schedule.createdTimestamp))
 
   const pending = views.filter((view) => view.status === 'pending')
-  const resolved = views.filter((view) => view.status !== 'pending')
-  const ordered = [...pending, ...resolved]
+  const ordered = views
 
   return (
     <section className="border border-rule bg-hero px-5 py-6 sm:px-8 sm:py-8">

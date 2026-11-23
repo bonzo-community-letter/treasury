@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { config } from '../config'
+import { newestFirst } from '../lib/time'
 import {
   fetchAccountIdsByPublicKey,
   fetchMirrorAccount,
@@ -122,7 +123,10 @@ export function useTreasurySnapshot(
       setState((prev) => ({
         ...prev,
         account: accountValue ?? prev.account,
-        transactions: transactionsValue.slice(0, SHOW_N * 2),
+        // Strictly newest first, whatever order the mirror answered in.
+        transactions: [...transactionsValue]
+          .sort(newestFirst((row) => row.consensusTimestamp))
+          .slice(0, SHOW_N * 2),
         schedules,
         updatedMs: Date.now(),
         loading: false,
