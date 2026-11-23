@@ -3,6 +3,7 @@ import { PrivateKey } from '@hiero-ledger/sdk'
 import { proto } from '@hiero-ledger/proto'
 import {
   buildAccountCreatePlan,
+  buildAccountUpdatePlan,
   buildSchedulePlan,
   buildTransferPlan,
   defaultScheduleMemo,
@@ -263,5 +264,87 @@ describe('derFromRaw round-trip', () => {
     const reparsed = parseSignerKey(derFromRaw('ecdsa', pub.toStringRaw().toLowerCase()))
     expect(reparsed.ok).toBe(true)
     if (reparsed.ok) expect(reparsed.key.toStringRaw()).toBe(pub.toStringRaw())
+  })
+})
+
+describe('buildAccountUpdatePlan', () => {
+  it('plans a threshold key change and nothing else', async () => {
+    const a = await edSigner('a')
+    const b = ecdsaSigner('b')
+    const built = buildAccountUpdatePlan({
+      network: 'mainnet',
+      accountId: '0.0.10964554',
+      keys: [a, b],
+      threshold: 2,
+    })
+    expect(built.ok).toBe(true)
+    if (!built.ok) return
+    expect(built.plan).toMatchObject({
+      kind: 'accountUpdate',
+      accountId: '0.0.10964554',
+      threshold: 2,
+      keyDers: [a.der, b.der],
+      keyCurves: ['ed25519', 'ecdsa'],
+    })
+  })
+
+  it('refuses a plan that changes nothing', async () => {
+    const a = await edSigner('a')
+    const built = buildAccountUpdatePlan({
+      network: 'mainnet',
+      accountId: '0.0.10964554',
+      keys: [a],
+      threshold: 1,
+      currentKeyDers: [a.der],
+      currentThreshold: 1,
+    })
+    expect(built.ok).toBe(false)
+    if (built.ok) return
+    expect(built.errors.join(' ')).toContain('nothing to change')
+  })
+
+  it('accepts the same keys with a different threshold', async () => {
+    const a = await edSigner('a')
+    const b = await edSigner('b')
+    const built = buildAccountUpdatePlan({
+      network: 'mainnet',
+      accountId: '0.0.10964554',
+      keys: [a, b],
+      threshold: 1,
+      currentKeyDers: [a.der, b.der],
+      currentThreshold: 2,
+    })
+    expect(built.ok).toBe(true)
+  })
+
+  it('refuses a threshold above the key count and a bad account id', async () => {
+    const a = await edSigner('a')
+    const tooHigh = buildAccountUpdatePlan({
+      network: 'mainnet',
+      accountId: '0.0.10964554',
+      keys: [a],
+      threshold: 2,
+    })
+    expect(tooHigh.ok).toBe(false)
+    if (!tooHigh.ok) expect(tooHigh.errors.join(' ')).toContain('cannot exceed')
+
+    const badId = buildAccountUpdatePlan({
+      network: 'mainnet',
+      accountId: 'not-an-account',
+      keys: [a],
+      threshold: 1,
+    })
+    expect(badId.ok).toBe(false)
+    if (!badId.ok) expect(badId.errors.join(' ')).toContain('account id')
+  })
+
+  it('refuses an empty key list', () => {
+    const built = buildAccountUpdatePlan({
+      network: 'mainnet',
+      accountId: '0.0.10964554',
+      keys: [],
+      threshold: 1,
+    })
+    expect(built.ok).toBe(false)
   })
 })

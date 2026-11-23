@@ -26,7 +26,10 @@ jobs:
     env:
       VITE_HEDERA_NETWORK: ${{ vars.VITE_HEDERA_NETWORK }}
       VITE_ADMIN_ACCOUNT: ${{ vars.VITE_ADMIN_ACCOUNT }}
-      VITE_TREASURY_ACCOUNTS: ${{ vars.VITE_TREASURY_ACCOUNTS }}
+      # Pinned treasury: with an id here the deployed page configures that account
+      # instead of offering a create. The repository variable wins; the literal is
+      # the fallback so a deploy never loses the pin.
+      VITE_TREASURY_ACCOUNTS: ${{ vars.VITE_TREASURY_ACCOUNTS || '0.0.10964554' }}
       VITE_WALLETCONNECT_PROJECT_ID: ${{ vars.VITE_WALLETCONNECT_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4

@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { config } from '../config'
 import { decodeMirrorKey, type TreasuryKeyStructure } from '../lib/accountKey'
 import { fetchMirrorAccount } from '../lib/mirror'
 
-export interface AccountKeyState {
+export interface AccountKeyData {
   /** the account's decoded key structure, or null while unread / unreadable */
   structure: TreasuryKeyStructure | null
   /** if the account's own key is a single key: its raw hex; else null */
@@ -12,7 +12,12 @@ export interface AccountKeyState {
   error: string | null
 }
 
-const EMPTY: AccountKeyState = { structure: null, singleRaw: null, loading: false, error: null }
+export interface AccountKeyState extends AccountKeyData {
+  /** re-read the key — call after a transaction that changed it */
+  refresh: () => void
+}
+
+const EMPTY: AccountKeyData = { structure: null, singleRaw: null, loading: false, error: null }
 
 /**
  * An account's key, read from the chain — the input the role decision is
@@ -20,7 +25,9 @@ const EMPTY: AccountKeyState = { structure: null, singleRaw: null, loading: fals
  * only; keys move rarely, and the mirror is not ours to hammer.
  */
 export function useAccountKey(accountId: string | null): AccountKeyState {
-  const [state, setState] = useState<AccountKeyState>(accountId ? { ...EMPTY, loading: true } : EMPTY)
+  const [state, setState] = useState<AccountKeyData>(accountId ? { ...EMPTY, loading: true } : EMPTY)
+  const [tick, setTick] = useState(0)
+  const refresh = useCallback(() => setTick((value) => value + 1), [])
 
   useEffect(() => {
     if (!accountId) {
@@ -46,7 +53,7 @@ export function useAccountKey(accountId: string | null): AccountKeyState {
     return () => {
       cancelled = true
     }
-  }, [accountId])
+  }, [accountId, tick])
 
-  return state
+  return { ...state, refresh }
 }

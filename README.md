@@ -26,8 +26,15 @@ reads the result back from the public mirror node.
    told this wallet holds no key here. The role badge is cosmetic. The chain
    enforces everything: only the admin's key can pay for a CryptoCreate, and
    only signatures from the treasury key list count.
-3. **Actions.** Admin: create a treasury (m-of-n threshold account, always a
-   threshold key even at 1-of-N, your wallet pays). Admin or signer: transfer
+3. **Actions.** Admin, with no treasury pinned: create one (m-of-n threshold
+   account, always a threshold key even at 1-of-N, your wallet pays). With a
+   treasury pinned in `VITE_TREASURY_ACCOUNTS` the create is replaced by a
+   configuration panel — change the threshold and the signer keys
+   (`AccountUpdateTransaction` on the account's key; everything else stays).
+   That update is authorized by the treasury's **current** key, so the
+   connected wallet must hold one of them; at 1-of-N one wallet suffices, at
+   m-of-N the transaction needs m signatures at once and the panel says so
+   instead of offering it. Admin or signer: transfer
    — a plain `CryptoTransfer` when the treasury's threshold is 1 (your wallet
    pays the fee and its key satisfies the 1-of-N), or a `ScheduleCreate`
    wrapping the transfer when the threshold is m > 1. The other signers
@@ -47,7 +54,7 @@ Copy `.env.example` to `.env.local` (gitignored) and fill in:
 ```
 VITE_HEDERA_NETWORK=mainnet          # mainnet | testnet (a typo throws at load)
 VITE_ADMIN_ACCOUNT=0.0.10964527      # the only account allowed to create treasuries
-VITE_TREASURY_ACCOUNTS=              # optional comma list; discovery fills the gap
+VITE_TREASURY_ACCOUNTS=              # pinned treasury id(s); when set, configure instead of create
 VITE_WALLETCONNECT_PROJECT_ID=       # WalletConnect Cloud project id
 ```
 
@@ -57,7 +64,10 @@ belongs in `.env.local` locally and in **repository variables** for CI — never
 in the repo. Never put a private key or any Hedera account secret in any of
 these files.
 
-**Treasury discovery.** When `VITE_TREASURY_ACCOUNTS` is empty the page lists
+**Pinned or discovered.** With an id in `VITE_TREASURY_ACCOUNTS` the page
+configures that account and never offers a create — the deployed build pins
+`0.0.10964554` through the workflow (`vars.VITE_TREASURY_ACCOUNTS || '0.0.10964554'`).
+When `VITE_TREASURY_ACCOUNTS` is empty the page lists
 what the admin account has created (its `CRYPTOCREATEACCOUNT` rows, `entity_id`
 per row) and unions that with the configured list. `?account=0.0.x` in the URL
 overrides everything and previews any account — that is how the app can be

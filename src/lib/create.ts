@@ -48,7 +48,7 @@ export interface CreateStages {
 }
 
 /** DER-plan key → SDK PublicKey, per curve. */
-function publicKeyFromPlanKey(sdk: SdkModule, curve: 'ed25519' | 'ecdsa', der: string) {
+export function publicKeyFromPlanKey(sdk: SdkModule, curve: 'ed25519' | 'ecdsa', der: string) {
   // The DER prefix was validated in `lib/keys.ts`; the raw bytes are what
   // follows it — 64 hex after `302a…`, 66 after `302d…`.
   const rawHex = der.startsWith('302a300506032b6570032100') ? der.slice(24) : der.slice(28)

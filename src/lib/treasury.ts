@@ -196,6 +196,108 @@ export function buildAccountCreatePlan(
   }
 }
 
+/* ── Layer 3a′: changing the treasury's key ────────────────────────────── */
+
+/**
+ * The plan for an AccountUpdate that swaps the treasury's key — the only
+ * thing this changes. The account keeps its id, its balance and its memo;
+ * what moves is who can sign for it.
+ *
+ * Signed by the CURRENT key, not by the admin: on Hedera an account's own
+ * key authorizes an update of that account. At 1-of-n one wallet can do it;
+ * at m-of-n the transaction needs m signatures at once, which one wallet
+ * session cannot produce — the UI says so rather than pretending.
+ */
+export interface AccountUpdatePlan {
+  readonly kind: 'accountUpdate'
+  readonly network: HederaNetwork
+  readonly accountId: string
+  /** the new signer keys as lowercase SPKI DER hex, in list order */
+  readonly keyDers: readonly string[]
+  readonly keyCurves: readonly ('ed25519' | 'ecdsa')[]
+  readonly threshold: number
+  readonly maxFeeTinybars: string
+}
+
+export interface AccountUpdateInput {
+  network: HederaNetwork
+  accountId: string
+  keys: readonly SignerKey[]
+  threshold: number
+  /** what the chain holds right now — a no-op is refused, not submitted */
+  currentKeyDers?: readonly string[]
+  currentThreshold?: number
+  maxFeeHbar?: string
+}
+
+const DER_SHAPES = [/^302a300506032b6570032100[0-9a-f]{64}$/, /^302d300706052b8104000a032200[0-9a-f]{66}$/]
+
+/** Each key's curve, or the reason it is not a key this app accepts. */
+function keyShapes(keys: readonly SignerKey[]): { curves: ('ed25519' | 'ecdsa')[]; errors: string[] } {
+  const curves: ('ed25519' | 'ecdsa')[] = []
+  const errors: string[] = []
+  for (const key of keys) {
+    const curve = curveOfDer(key.der)
+    if (!curve || !DER_SHAPES.some((shape) => shape.test(key.der))) {
+      errors.push(`Signer key ${key.id.slice(0, 8)}… is not a DER public key (ED25519 302a… or ECDSA 302d…).`)
+    } else {
+      curves.push(curve)
+    }
+  }
+  return { curves, errors }
+}
+
+export function buildAccountUpdatePlan(
+  input: AccountUpdateInput,
+): { ok: true; plan: AccountUpdatePlan } | { ok: false; errors: string[] } {
+  const errors: string[] = []
+
+  let accountValue = ''
+  const accountId = validateAccountId(input.accountId, 'Treasury account')
+  if (accountId.ok) accountValue = accountId.value
+  else errors.push(accountId.error)
+
+  let thresholdValue = 0
+  const m = validateThreshold(input.threshold, input.keys.length)
+  if (m.ok) thresholdValue = m.value
+  else errors.push(m.error)
+
+  let feeTinybars = ''
+  const fee = parseHbarAmount(input.maxFeeHbar ?? DEFAULT_MAX_FEE_HBAR, 'Max fee')
+  if (fee.ok) feeTinybars = fee.value
+  else errors.push(fee.error)
+
+  if (input.keys.length < 1) errors.push('Add at least one signer key.')
+  if (input.keys.length > MAX_SIGNERS) errors.push(`A treasury takes at most ${MAX_SIGNERS} signer keys.`)
+
+  const { curves, errors: shapeErrors } = keyShapes(input.keys)
+  errors.push(...shapeErrors)
+
+  if (input.currentKeyDers && input.currentThreshold !== undefined) {
+    const sameKeys =
+      input.currentKeyDers.length === input.keys.length &&
+      input.keys.every((key) => input.currentKeyDers?.includes(key.der))
+    if (sameKeys && input.currentThreshold === input.threshold) {
+      errors.push('The key on chain is already exactly this — there is nothing to change.')
+    }
+  }
+
+  if (errors.length > 0) return { ok: false, errors }
+
+  return {
+    ok: true,
+    plan: {
+      kind: 'accountUpdate',
+      network: input.network,
+      accountId: accountValue,
+      keyDers: input.keys.map((key) => key.der),
+      keyCurves: curves,
+      threshold: thresholdValue,
+      maxFeeTinybars: feeTinybars,
+    },
+  }
+}
+
 /* ── Layer 3b: transfers, direct and scheduled ─────────────────────────── */
 
 /** A plain CryptoTransfer debiting the treasury — the 1-of-N path. */

@@ -13,6 +13,7 @@ import { BalanceCard } from './components/BalanceCard'
 import { TransactionsPanel } from './components/TransactionsPanel'
 import { SchedulesPanel } from './components/SchedulesPanel'
 import { CreateTreasuryPanel } from './components/CreateTreasuryPanel'
+import { ConfigureTreasuryPanel } from './components/ConfigureTreasuryPanel'
 import { TransferPanel } from './components/TransferPanel'
 import { Note } from './components/ui'
 
@@ -63,6 +64,8 @@ export function App() {
     [urlOverride, discovered],
   )
   const treasuryId = selected ?? treasuries[0] ?? null
+  /** A treasury pinned in the build config is configured, never replaced by a new one. */
+  const pinnedTreasury = config.configuredTreasuryAccounts.length > 0
 
   const treasuryKey = useAccountKey(treasuryId)
   const walletKey = useAccountKey(wallet.status === 'connected' ? wallet.accountId : null)
@@ -176,7 +179,16 @@ export function App() {
           </>
         ) : null}
 
-        {connected && role === 'admin' ? (
+        {pinnedTreasury ? (
+          connected && (role === 'admin' || role === 'signer') && treasuryKey.structure && treasuryId ? (
+            <ConfigureTreasuryPanel
+              treasuryId={treasuryId}
+              structure={treasuryKey.structure}
+              connectedKeyRaw={walletKey.singleRaw}
+              onUpdated={treasuryKey.refresh}
+            />
+          ) : null
+        ) : connected && role === 'admin' ? (
           <CreateTreasuryPanel
             onCreated={(accountId) => {
               setDiscovered((list) => (list.includes(accountId) ? list : [...list, accountId]))
