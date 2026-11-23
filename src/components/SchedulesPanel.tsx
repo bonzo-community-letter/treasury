@@ -1,21 +1,15 @@
 import { useState } from 'react'
 import { config } from '../config'
-import { hashscanScheduleUrl, hashscanTimestampUrl } from '../lib/hedera'
+import { hashscanScheduleUrl } from '../lib/hedera'
 import { fingerprint } from '../lib/keys'
 import { formatHbar } from '../lib/treasury'
-import { countdown } from '../lib/time'
-import {
-  hasKeySigned,
-  scheduleView,
-  SCHEDULE_STATUS_LABEL,
-  type PendingScheduleView,
-  type ScheduleStatus,
-} from '../lib/schedule'
+import { countdown, secondsOfTimestamp, shortDateTime } from '../lib/time'
+import { hasKeySigned, scheduleView, type PendingScheduleView } from '../lib/schedule'
 import type { TreasuryKeyStructure } from '../lib/accountKey'
 import type { MirrorSchedule } from '../lib/mirror'
 import { signSchedule } from '../lib/transfer'
 import type { Role } from '../lib/roles'
-import { ErrorNote } from './ui'
+import { StatusBadge, type StatusTone } from './ui'
 
 interface Props {
   treasuryId: string
@@ -28,20 +22,46 @@ interface Props {
   onSigned: () => void
 }
 
-const STATUS_CLASS: Record<ScheduleStatus, string> = {
-  pending: 'text-accent',
-  executed: 'text-ink-soft',
-  expired: 'text-ink-faint',
-  cancelled: 'text-ink-faint',
+interface Badge {
+  label: string
+  tone: StatusTone
+  detail?: string
 }
 
 /**
- * The pending scheduled transfers, exactly as the mirror reports them:
- * signatures collected, expiry, execution, deletion. Per-signer checkmarks
- * match the schedule's `public_key_prefix` values (base64 of the raw public
- * key) against the treasury's keys — the same comparison the network makes,
- * run against the network's own answer. Status comes from the mirror on
- * every read, never from what this page assumed at create time.
+ * One schedule's status, in the same pill the transactions table uses.
+ * WAITING means the network still lacks signatures; a schedule that will
+ * never run (expired, cancelled) reads as Error, with the network's reason on
+ * the tooltip.
+ */
+function badgeOf(view: PendingScheduleView, nowSec: number): Badge {
+  if (view.status === 'pending') {
+    return {
+      label: 'Waiting',
+      tone: 'waiting',
+      detail: `${view.collected} of ${view.threshold} signatures · expires ${countdown(view.expirySec, nowSec)}`,
+    }
+  }
+  if (view.status === 'executed') return { label: 'Executed', tone: 'ok' }
+  if (view.status === 'expired') {
+    return {
+      label: 'Error',
+      tone: 'error',
+      detail: `Expired unsigned after ${view.collected} of ${view.threshold} signatures. Nothing moved.`,
+    }
+  }
+  return {
+    label: 'Error',
+    tone: 'error',
+    detail: view.schedule.memo ? `Cancelled. Memo: ${view.schedule.memo}` : 'Cancelled.',
+  }
+}
+
+/**
+ * The scheduled transfers, read from the mirror and laid out as the same
+ * table as the recent transactions: time, recipient, amount, signatures,
+ * status, action. Status is the network's answer, never what this page
+ * assumed at create time; a waiting row carries its Sign button.
  */
 export function SchedulesPanel({
   treasuryId,
@@ -68,6 +88,7 @@ export function SchedulesPanel({
 
   const pending = views.filter((view) => view.status === 'pending')
   const resolved = views.filter((view) => view.status !== 'pending')
+  const ordered = [...pending, ...resolved]
 
   return (
     <section className="border border-rule bg-hero px-5 py-6 sm:px-8 sm:py-8">
@@ -76,39 +97,70 @@ export function SchedulesPanel({
         {pending.length === 0 ? 'Nothing awaiting signatures' : `${pending.length} awaiting signatures`}
       </h2>
 
-      {pending.length === 0 && resolved.length === 0 ? (
+      {views.length === 0 ? (
         <p className="mt-4 text-sm leading-relaxed text-ink-soft">
           Scheduled transfers stay here until their threshold signs.
         </p>
-      ) : null}
+      ) : (
+        <>
+          <div className="mt-4 hidden overflow-x-auto sm:block">
+            <table className="w-full border-collapse text-left text-sm">
+              <thead>
+                <tr className="border-b border-rule text-[0.625rem] uppercase tracking-[0.14em] text-ink-faint">
+                  <th className="py-2 pr-4 font-semibold">Time</th>
+                  <th className="py-2 pr-4 font-semibold">Recipient</th>
+                  <th className="py-2 pr-4 text-right font-semibold">Amount</th>
+                  <th className="py-2 pr-4 font-semibold">Signatures</th>
+                  <th className="py-2 pr-4 font-semibold">Status</th>
+                  <th className="py-2 font-semibold">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {ordered.map((view) => (
+                  <ScheduleRow
+                    key={view.schedule.scheduleId}
+                    view={view}
+                    role={role}
+                    connectedKeyRaw={connectedKeyRaw}
+                    nowSec={nowSec}
+                    onSigned={onSigned}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-      <div className="mt-4 space-y-4">
-        {pending.map((view) => (
-          <PendingCard
-            key={view.schedule.scheduleId}
-            view={view}
-            role={role}
-            connectedKeyRaw={connectedKeyRaw}
-            nowSec={nowSec}
-            onSigned={onSigned}
-          />
-        ))}
-        {resolved.map((view) => (
-          <ResolvedRow key={view.schedule.scheduleId} view={view} />
-        ))}
-      </div>
+          <ul className="mt-4 space-y-4 sm:hidden">
+            {ordered.map((view) => (
+              <MobileSchedule
+                key={`${view.schedule.scheduleId}-m`}
+                view={view}
+                role={role}
+                connectedKeyRaw={connectedKeyRaw}
+                nowSec={nowSec}
+                onSigned={onSigned}
+              />
+            ))}
+          </ul>
 
-      {views.length > 0 ? (
-        <p className="mt-5 text-xs leading-relaxed text-ink-faint">
-          Schedules are indexed by creator; this list covers the treasury and the accounts holding
-          its keys.
-        </p>
-      ) : null}
+          <p className="mt-5 text-xs leading-relaxed text-ink-faint">
+            Schedules are indexed by creator; this list covers the treasury and the accounts holding
+            its keys.
+          </p>
+        </>
+      )}
     </section>
   )
 }
 
-function PendingCard({
+/** The per-signer list, as the signatures cell's tooltip. */
+function signerDetail(view: PendingScheduleView): string {
+  return view.signers
+    .map((signer) => `${signer.signed ? '✓' : '·'} ${signer.key.curve} ${fingerprint(signer.key.der)}`)
+    .join('\n')
+}
+
+function ScheduleRow({
   view,
   role,
   connectedKeyRaw,
@@ -121,136 +173,156 @@ function PendingCard({
   nowSec: number
   onSigned: () => void
 }) {
-  const [phase, setPhase] = useState<'idle' | 'submitting' | 'receipt'>('idle')
-  const [outcome, setOutcome] = useState<string | null>(null)
+  const { phase, message, sign } = useSign(view, role, connectedKeyRaw, onSigned)
+  const badge = badgeOf(view, nowSec)
+  const createdSec = secondsOfTimestamp(view.schedule.createdTimestamp ?? null)
+
+  return (
+    <tr className="border-b border-rule/60 align-baseline last:border-b-0">
+      <td className="tnum py-2.5 pr-4 whitespace-nowrap text-ink-soft">
+        {shortDateTime(createdSec)}
+        <a
+          href={hashscanScheduleUrl(config.network, view.schedule.scheduleId)}
+          target="_blank"
+          rel="noreferrer"
+          title={view.schedule.memo || undefined}
+          className="block font-mono text-[0.625rem] tracking-normal text-ink-faint underline decoration-rule underline-offset-2 hover:text-ink-soft hover:decoration-accent"
+        >
+          {view.schedule.scheduleId}
+        </a>
+      </td>
+      <td className="py-2.5 pr-4 font-mono text-xs break-all text-ink-soft">{view.transfer.recipient}</td>
+      <td className="tnum py-2.5 pr-4 text-right whitespace-nowrap text-ink">
+        {formatHbar(view.transfer.amountOutTinybars)}
+      </td>
+      <td className="tnum py-2.5 pr-4 whitespace-nowrap text-ink-soft" title={signerDetail(view)}>
+        {view.collected} of {view.threshold}
+      </td>
+      <td className="py-2.5 pr-4">
+        <StatusBadge label={badge.label} tone={badge.tone} detail={badge.detail} />
+      </td>
+      <td className="py-2.5">
+        {phase === 'hidden' ? (
+          <span className="text-ink-faint">—</span>
+        ) : (
+          <SignButton phase={phase} label={view.schedule.scheduleId} onSign={sign} />
+        )}
+        {message ? (
+          <p className="mt-1 max-w-[16rem] text-[0.625rem] leading-snug text-ink-faint">{message}</p>
+        ) : null}
+      </td>
+    </tr>
+  )
+}
+
+function MobileSchedule({
+  view,
+  role,
+  connectedKeyRaw,
+  nowSec,
+  onSigned,
+}: {
+  view: PendingScheduleView
+  role: Role
+  connectedKeyRaw: string | null
+  nowSec: number
+  onSigned: () => void
+}) {
+  const { phase, message, sign } = useSign(view, role, connectedKeyRaw, onSigned)
+  const badge = badgeOf(view, nowSec)
+  const createdSec = secondsOfTimestamp(view.schedule.createdTimestamp ?? null)
+
+  return (
+    <li className="border-b border-rule/60 pb-3 last:border-b-0 last:pb-0">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="tnum text-xs text-ink-soft">{shortDateTime(createdSec)}</span>
+        <span className="tnum text-sm text-ink">{formatHbar(view.transfer.amountOutTinybars)}</span>
+      </div>
+      <div className="mt-1 flex items-baseline justify-between gap-3">
+        <StatusBadge label={badge.label} tone={badge.tone} detail={badge.detail} />
+        <span className="tnum text-[0.625rem] uppercase tracking-[0.12em] text-ink-faint">
+          {view.collected} of {view.threshold} signatures
+        </span>
+      </div>
+      <p className="mt-1 break-all font-mono text-xs text-ink-soft">{view.transfer.recipient}</p>
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        {phase !== 'hidden' ? (
+          <SignButton phase={phase} label={view.schedule.scheduleId} onSign={sign} />
+        ) : null}
+        <a
+          href={hashscanScheduleUrl(config.network, view.schedule.scheduleId)}
+          target="_blank"
+          rel="noreferrer"
+          className="text-[0.6875rem] uppercase tracking-[0.14em] text-ink-faint underline decoration-rule underline-offset-4 hover:text-ink-soft hover:decoration-accent"
+        >
+          HashScan
+        </a>
+      </div>
+      {message ? <p className="mt-1 text-[0.625rem] leading-snug text-ink-faint">{message}</p> : null}
+    </li>
+  )
+}
+
+type SignPhase = 'hidden' | 'idle' | 'submitting' | 'receipt'
+
+/** The signing state of one row — hidden when this wallet cannot sign it. */
+function useSign(
+  view: PendingScheduleView,
+  role: Role,
+  connectedKeyRaw: string | null,
+  onSigned: () => void,
+) {
+  const [phase, setPhase] = useState<SignPhase>('idle')
+  const [message, setMessage] = useState<string | null>(null)
+
   const canSign = role === 'admin' || role === 'signer'
   const alreadySigned = hasKeySigned(view, connectedKeyRaw)
-  const mine = view.signers.find((signer) => signer.key.raw === connectedKeyRaw?.toLowerCase())
+  const hidden = !canSign || view.status !== 'pending' || alreadySigned
 
   const sign = async (): Promise<void> => {
-    setOutcome(null)
+    setMessage(null)
     try {
       const result = await signSchedule(view.schedule.scheduleId, {
         submitting: () => setPhase('submitting'),
         awaitingReceipt: () => setPhase('receipt'),
       })
       if (result.kind === 'succeeded') {
-        setOutcome('Signed. The mirror will show the next count in a moment.')
+        setMessage('Signed. The network updates the count shortly.')
         onSigned()
       } else if (result.kind === 'failed') {
-        setOutcome(`The network refused: ${result.status}.`)
+        setMessage(`The network refused: ${result.status}.`)
       } else {
-        setOutcome('Your wallet answered; the mirror has not indexed it yet. Check the link.')
+        setMessage('The wallet answered; the mirror has not indexed it yet.')
       }
     } catch (error) {
-      setOutcome(error instanceof Error ? error.message : 'The signing request failed.')
+      setMessage(error instanceof Error ? error.message : 'The signing request failed.')
     } finally {
       setPhase('idle')
     }
   }
 
-  return (
-    <div className="border border-rule bg-page px-4 py-5 sm:px-6">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-        <p className="font-mono text-sm text-ink">{view.schedule.scheduleId}</p>
-        <p className="tnum text-sm text-ink-soft">
-          {formatHbar(view.transfer.amountOutTinybars)} →{' '}
-          <span className="font-mono text-xs">{view.transfer.recipient}</span>
-        </p>
-      </div>
-
-      {view.schedule.memo.length > 0 ? (
-        <p className="mt-2 text-xs italic text-ink-faint">“{view.schedule.memo}”</p>
-      ) : null}
-
-      <p className="mt-3 text-sm text-ink-soft">
-        <span className={`tnum ${view.collected >= view.threshold ? 'text-accent' : ''}`}>
-          {view.collected} of {view.threshold}
-        </span>{' '}
-        signatures collected · {SCHEDULE_STATUS_LABEL[view.status]} · expires {countdown(view.expirySec, nowSec)}
-      </p>
-
-      <ul className="mt-3 flex flex-wrap gap-2">
-        {view.signers.map((signer) => (
-          <li
-            key={signer.key.raw}
-            className={`border px-2 py-1 font-mono text-[0.6875rem] ${
-              signer.signed ? 'border-accent/60 text-ink' : 'border-rule text-ink-faint'
-            }`}
-          >
-            {signer.signed ? '✓ ' : '· '}
-            {signer.key.curve} {fingerprint(signer.key.der)}
-            {mine && mine.key.raw === signer.key.raw ? ' (you)' : ''}
-          </li>
-        ))}
-      </ul>
-
-      <div className="mt-4 flex flex-wrap items-center gap-3">
-        {canSign ? (
-          <button
-            type="button"
-            disabled={phase !== 'idle' || alreadySigned}
-            onClick={() => void sign()}
-            className="rounded-sm bg-accent px-4 py-2 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-page transition-colors hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {alreadySigned
-              ? 'Already signed'
-              : phase === 'submitting'
-                ? 'Awaiting your wallet…'
-                : phase === 'receipt'
-                  ? 'Reading the receipt…'
-                  : 'Sign this schedule'}
-          </button>
-        ) : null}
-        <a
-          href={hashscanScheduleUrl(config.network, view.schedule.scheduleId)}
-          target="_blank"
-          rel="noreferrer"
-          className="text-xs underline decoration-rule underline-offset-4 transition-colors hover:decoration-accent"
-        >
-          HashScan
-        </a>
-      </div>
-
-      {outcome ? (
-        <p className="mt-3">
-          <ErrorNote>{outcome}</ErrorNote>
-        </p>
-      ) : null}
-    </div>
-  )
+  return { phase: hidden ? ('hidden' as SignPhase) : phase, message, sign }
 }
 
-function ResolvedRow({ view }: { view: PendingScheduleView }) {
-  const { schedule, status, transfer } = view
-  const plain =
-    status === 'executed' ? (
-      <>
-        Executed — {formatHbar(transfer.amountOutTinybars)} to{' '}
-        <span className="font-mono text-xs">{transfer.recipient}</span>.{' '}
-        <a
-          href={
-            view.executedTimestamp
-              ? hashscanTimestampUrl(config.network, view.executedTimestamp)
-              : hashscanScheduleUrl(config.network, schedule.scheduleId)
-          }
-          target="_blank"
-          rel="noreferrer"
-          className="underline decoration-rule underline-offset-4 transition-colors hover:decoration-accent"
-        >
-          HashScan
-        </a>
-      </>
-    ) : status === 'expired' ? (
-      <>Expired unsigned after {view.collected} of {view.threshold} signatures — nothing moved.</>
-    ) : (
-      <>Cancelled. {schedule.memo ? `Memo: ${schedule.memo}.` : ''}</>
-    )
-
+function SignButton({
+  phase,
+  label,
+  onSign,
+}: {
+  phase: SignPhase
+  label: string
+  onSign: () => void
+}) {
+  const busy = phase === 'submitting' || phase === 'receipt'
   return (
-    <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border border-rule/60 px-4 py-3">
-      <p className="font-mono text-xs text-ink-faint">{schedule.scheduleId}</p>
-      <p className={`text-sm ${STATUS_CLASS[status]}`}>{plain}</p>
-    </div>
+    <button
+      type="button"
+      aria-label={`Sign schedule ${label}`}
+      disabled={busy}
+      onClick={onSign}
+      className="rounded-sm border border-accent bg-accent px-3 py-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-page transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+    >
+      {phase === 'submitting' ? 'Awaiting wallet…' : phase === 'receipt' ? 'Reading…' : 'Sign'}
+    </button>
   )
 }

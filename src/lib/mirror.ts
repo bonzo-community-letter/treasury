@@ -160,6 +160,8 @@ export interface MirrorSignature {
 
 export interface MirrorSchedule {
   readonly scheduleId: string
+  /** when the schedule was created (the row's consensus timestamp) */
+  readonly createdTimestamp?: string | null
   readonly creatorAccountId: string | null
   readonly payerAccountId: string | null
   readonly executedTimestamp: string | null
@@ -177,6 +179,7 @@ interface RawMirrorSignature {
 }
 
 interface RawMirrorSchedule {
+  consensus_timestamp?: string
   schedule_id?: string
   creator_account_id?: string | null
   payer_account_id?: string | null
@@ -192,6 +195,7 @@ function toSchedule(raw: RawMirrorSchedule): MirrorSchedule | null {
   if (typeof raw.schedule_id !== 'string') return null
   return {
     scheduleId: raw.schedule_id,
+    createdTimestamp: typeof raw.consensus_timestamp === 'string' ? raw.consensus_timestamp : null,
     creatorAccountId: typeof raw.creator_account_id === 'string' ? raw.creator_account_id : null,
     payerAccountId: typeof raw.payer_account_id === 'string' ? raw.payer_account_id : null,
     executedTimestamp: typeof raw.executed_timestamp === 'string' ? raw.executed_timestamp : null,

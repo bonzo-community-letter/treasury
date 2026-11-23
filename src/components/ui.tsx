@@ -82,3 +82,47 @@ export function FieldLabel({ children }: { children: ReactNode }) {
     </span>
   )
 }
+
+export type StatusTone = 'ok' | 'waiting' | 'error'
+
+const STATUS_TONE_CLASS: Record<StatusTone, string> = {
+  ok: 'border-rule text-ink-soft',
+  waiting: 'border-accent/70 text-accent',
+  error: 'border-accent bg-accent text-page',
+}
+
+/**
+ * A status pill. When there is a reason behind it — the network's own word for
+ * a failure, or why a schedule is still waiting — the reason rides on the
+ * badge as a tooltip, so the table stays scannable and the detail is one hover
+ * away.
+ */
+export function StatusBadge({
+  label,
+  tone,
+  detail,
+}: {
+  label: string
+  tone: StatusTone
+  detail?: string
+}) {
+  return (
+    <span className="group relative inline-flex">
+      <span
+        tabIndex={detail ? 0 : undefined}
+        aria-label={detail ? `${label}: ${detail}` : label}
+        className={`border px-2 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-[0.14em] ${STATUS_TONE_CLASS[tone]}`}
+      >
+        {label}
+      </span>
+      {detail ? (
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute bottom-full right-0 z-20 mb-1.5 hidden w-max max-w-[15rem] break-words border border-rule bg-page px-2.5 py-1.5 text-[0.6875rem] font-normal normal-case leading-snug tracking-normal text-ink-soft shadow-lg shadow-black/40 group-hover:block group-focus-within:block"
+        >
+          {detail}
+        </span>
+      ) : null}
+    </span>
+  )
+}

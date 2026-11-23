@@ -3,6 +3,7 @@ import { hashscanTransactionUrl } from '../lib/hedera'
 import { formatHbar } from '../lib/treasury'
 import { shortDateTime } from '../lib/time'
 import { summarizeTransactions } from '../lib/txSummary'
+import { StatusBadge } from './ui'
 import type { MirrorTransactionRow } from '../lib/mirror'
 
 interface Props {
@@ -47,6 +48,10 @@ export function TransactionsPanel({ treasuryId, rows }: Props) {
                   {row.type.replace(/^CRYPTO/, '')}
                   {row.scheduled ? ' · scheduled' : ''}
                 </span>
+                <ResultBadge result={row.result} />
+              </div>
+              <div className="mt-1 flex items-baseline justify-between gap-3">
+                <span />
                 <a
                   href={hashscanTransactionUrl(config.network, row.transactionId)}
                   target="_blank"
@@ -69,7 +74,7 @@ export function TransactionsPanel({ treasuryId, rows }: Props) {
                 <th className="hidden py-2 pr-4 font-semibold sm:table-cell">Type</th>
                 <th className="py-2 pr-4 font-semibold">Counterparty</th>
                 <th className="py-2 pr-4 text-right font-semibold">Treasury</th>
-                <th className="hidden py-2 pr-4 font-semibold sm:table-cell">Result</th>
+                <th className="hidden py-2 pr-4 font-semibold sm:table-cell">Status</th>
                 <th className="py-2 font-semibold">Explorer</th>
               </tr>
             </thead>
@@ -93,8 +98,8 @@ export function TransactionsPanel({ treasuryId, rows }: Props) {
                   <td className="tnum py-2.5 pr-4 text-right whitespace-nowrap text-ink">
                     {row.treasuryDelta === null ? '—' : formatHbar(row.treasuryDelta)}
                   </td>
-                  <td className={`hidden py-2.5 pr-4 whitespace-nowrap sm:table-cell ${row.result === 'SUCCESS' ? 'text-ink-soft' : 'text-accent'}`}>
-                    {row.result || '—'}
+                  <td className="hidden py-2.5 pr-4 whitespace-nowrap sm:table-cell">
+                    <ResultBadge result={row.result} />
                   </td>
                   <td className="py-2.5">
                     <a
@@ -115,4 +120,14 @@ export function TransactionsPanel({ treasuryId, rows }: Props) {
       )}
     </section>
   )
+}
+
+/**
+ * The network's result word as a badge: SUCCESS stays quiet, anything else
+ * reads Error and carries the raw word on the tooltip.
+ */
+function ResultBadge({ result }: { result: string }) {
+  if (!result) return <span className="text-ink-faint">—</span>
+  if (result === 'SUCCESS') return <StatusBadge label="Success" tone="ok" />
+  return <StatusBadge label="Error" tone="error" detail={result} />
 }
