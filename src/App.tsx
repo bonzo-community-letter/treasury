@@ -3,6 +3,7 @@ import { config, urlAccountOverride, walletReady } from './config'
 import { resolveRole, VISITOR_NOTE } from './lib/roles'
 import { hashscanAccountUrl } from './lib/hedera'
 import { useAccountKey } from './hooks/useAccountKey'
+import { useKeyAccounts } from './hooks/useKeyAccounts'
 import { useTreasurySnapshot } from './hooks/useTreasurySnapshot'
 import { useUsdPrice } from './hooks/useUsdPrice'
 import { useWallet } from './hooks/useWallet'
@@ -50,6 +51,7 @@ export function App() {
   const treasuryId = selected ?? treasuries[0] ?? null
 
   const treasuryKey = useAccountKey(treasuryId)
+  const signerAccounts = useKeyAccounts(treasuryKey.structure?.keys.map((key) => key.raw) ?? [])
   const walletKey = useAccountKey(wallet.status === 'connected' ? wallet.accountId : null)
   const snapshot = useTreasurySnapshot(treasuryId, wallet.status === 'connected' ? wallet.accountId : null)
   const price = useUsdPrice()
@@ -182,6 +184,7 @@ export function App() {
                   role={role}
                   connectedKeyRaw={walletKey.singleRaw}
                   nowSec={nowSec}
+                  accountIds={signerAccounts}
                   onSigned={snapshot.refresh}
                 />
 
@@ -240,6 +243,7 @@ export function App() {
           treasuryId={treasuryId}
           structure={treasuryKey.structure}
           connectedKeyRaw={walletKey.singleRaw}
+          accountIds={signerAccounts}
           onUpdated={treasuryKey.refresh}
         />
       ) : null}

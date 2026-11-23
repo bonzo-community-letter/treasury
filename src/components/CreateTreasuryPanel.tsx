@@ -3,6 +3,7 @@ import { config } from '../config'
 import { hashscanAccountUrl } from '../lib/hedera'
 import { addSigner, fingerprint, parseSignerKey, removeSigner, type SignerKey } from '../lib/keys'
 import { buildAccountCreatePlan, thresholdHelper } from '../lib/treasury'
+import { useKeyAccounts } from '../hooks/useKeyAccounts'
 import { createTreasuryAccount, type CreateOutcome } from '../lib/create'
 import { CopyButton, ErrorNote, FieldLabel, monoInputClass, Panel, primaryAction, inputClass } from './ui'
 
@@ -19,6 +20,7 @@ type Phase = 'form' | 'submitting' | 'receipt' | 'done'
  */
 export function CreateTreasuryPanel({ onCreated }: { onCreated: (accountId: string) => void }) {
   const [signers, setSigners] = useState<SignerKey[]>([])
+  const accountIds = useKeyAccounts(signers.map((signer) => signer.raw))
   const [keyInput, setKeyInput] = useState('')
   const [labelInput, setLabelInput] = useState('')
   const [threshold, setThreshold] = useState('2')
@@ -143,8 +145,9 @@ export function CreateTreasuryPanel({ onCreated }: { onCreated: (accountId: stri
             {signers.map((signer) => (
               <li key={signer.id} className="flex items-baseline justify-between gap-3 border border-rule bg-page px-3 py-2">
                 <span className="min-w-0 font-mono text-xs text-ink-soft">
-                  <span className="text-ink">{signer.label || 'unnamed'}</span>{' '}
-                  {fingerprint(signer.der)} · {signer.curve}
+                  {signer.label ? <span className="text-ink">{signer.label} </span> : null}
+                  <span className="text-ink">{accountIds.get(signer.raw) ?? fingerprint(signer.der)}</span>{' '}
+                  · {signer.curve}
                 </span>
                 <button
                   type="button"

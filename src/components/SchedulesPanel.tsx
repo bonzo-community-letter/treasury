@@ -19,6 +19,8 @@ interface Props {
   /** the connected wallet's raw key, when it is readable and single */
   connectedKeyRaw: string | null
   nowSec: number
+  /** raw key → the account that holds it, when the mirror knows one */
+  accountIds: ReadonlyMap<string, string>
   onSigned: () => void
 }
 
@@ -70,6 +72,7 @@ export function SchedulesPanel({
   role,
   connectedKeyRaw,
   nowSec,
+  accountIds,
   onSigned,
 }: Props) {
   if (!structure) {
@@ -123,6 +126,7 @@ export function SchedulesPanel({
                     role={role}
                     connectedKeyRaw={connectedKeyRaw}
                     nowSec={nowSec}
+                    accountIds={accountIds}
                     onSigned={onSigned}
                   />
                 ))}
@@ -153,10 +157,13 @@ export function SchedulesPanel({
   )
 }
 
-/** The per-signer list, as the signatures cell's tooltip. */
-function signerDetail(view: PendingScheduleView): string {
+/** The per-signer list, as the signatures cell's tooltip — accounts when known. */
+function signerDetail(view: PendingScheduleView, accountIds: ReadonlyMap<string, string>): string {
   return view.signers
-    .map((signer) => `${signer.signed ? '✓' : '·'} ${signer.key.curve} ${fingerprint(signer.key.der)}`)
+    .map(
+      (signer) =>
+        `${signer.signed ? '✓' : '·'} ${accountIds.get(signer.key.raw) ?? `${signer.key.curve} ${fingerprint(signer.key.der)}`}`,
+    )
     .join('\n')
 }
 
@@ -165,12 +172,14 @@ function ScheduleRow({
   role,
   connectedKeyRaw,
   nowSec,
+  accountIds,
   onSigned,
 }: {
   view: PendingScheduleView
   role: Role
   connectedKeyRaw: string | null
   nowSec: number
+  accountIds: ReadonlyMap<string, string>
   onSigned: () => void
 }) {
   const { phase, message, sign } = useSign(view, role, connectedKeyRaw, onSigned)
@@ -195,7 +204,7 @@ function ScheduleRow({
       <td className="tnum py-2.5 pr-4 text-right whitespace-nowrap text-ink">
         {formatHbar(view.transfer.amountOutTinybars)}
       </td>
-      <td className="tnum py-2.5 pr-4 whitespace-nowrap text-ink-soft" title={signerDetail(view)}>
+      <td className="tnum py-2.5 pr-4 whitespace-nowrap text-ink-soft" title={signerDetail(view, accountIds)}>
         {view.collected} of {view.threshold}
       </td>
       <td className="py-2.5 pr-4">

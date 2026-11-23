@@ -14,6 +14,7 @@ export function SettingsDialog({
   treasuryId,
   structure,
   connectedKeyRaw,
+  accountIds,
   onUpdated,
 }: {
   open: boolean
@@ -21,6 +22,7 @@ export function SettingsDialog({
   treasuryId: string
   structure: TreasuryKeyStructure
   connectedKeyRaw: string | null
+  accountIds: ReadonlyMap<string, string>
   onUpdated: () => void
 }) {
   const panel = useRef<HTMLDivElement>(null)
@@ -83,6 +85,7 @@ export function SettingsDialog({
             treasuryId={treasuryId}
             structure={structure}
             connectedKeyRaw={connectedKeyRaw}
+            accountIds={accountIds}
             onUpdated={onUpdated}
           />
         </div>
