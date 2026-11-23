@@ -17,7 +17,7 @@ import {
 } from '../lib/transfer'
 import type { TreasuryKeyStructure } from '../lib/accountKey'
 import { structureHasRaw } from '../lib/accountKey'
-import { ErrorNote, FieldLabel, inputClass, Note, Panel, primaryAction, Switch } from './ui'
+import { ErrorNote, FieldLabel, inputClass, Note, Panel, primaryAction, Spinner, Switch } from './ui'
 
 interface Props {
   treasuryId: string
@@ -286,10 +286,11 @@ export function TransferPanel({
           <div className="flex flex-wrap items-center gap-4">
             <button
               type="button"
-              className={primaryAction}
+              className={`${primaryAction} inline-flex items-center gap-2`}
               disabled={phase !== 'form'}
               onClick={() => void submit()}
             >
+              {phase !== 'form' ? <Spinner /> : null}
               {phase === 'submitting'
                 ? 'Awaiting your wallet…'
                 : phase === 'receipt'

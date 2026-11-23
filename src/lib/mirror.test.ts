@@ -35,6 +35,17 @@ describe('fetchMirrorTransactions', () => {
     })
   })
 
+  it('asks the mirror in its own id form, never the wallet form', async () => {
+    const seen: string[] = []
+    const capture = (async (url: string) => {
+      seen.push(String(url))
+      return jsonResponse({ transactions: [createRow] })
+    }) as unknown as typeof fetch
+    await fetchMirrorTransactions('testnet', '0.0.9@1700000000.000000001', capture)
+    expect(seen[0]).toContain('/transactions/0.0.9-1700000000-000000001')
+    expect(seen[0]).not.toContain('@')
+  })
+
   it('treats an unknown transaction as empty, not as failure', async () => {
     const rows = await fetchMirrorTransactions(
       'testnet',

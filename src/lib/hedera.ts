@@ -52,6 +52,16 @@ export function hashscanTransactionUrl(network: HederaNetwork, transactionId: st
   return `${HASHSCAN_BASE[network]}/transaction/${normalized}`
 }
 
+/**
+ * The mirror's id form: `0.0.1234-1700000000-000000000`. The SDK and the
+ * wallets hand over `0.0.1234@1700000000.000000000`, which the mirror answers
+ * with HTTP 400 — so a receipt lookup on that form never matches and the
+ * submit appears to hang until the poll budget runs out.
+ */
+export function mirrorTransactionId(transactionId: string): string {
+  return transactionId.replace(/^(\d+\.\d+\.\d+)@(\d+)\.(\d+)$/, '$1-$2-$3')
+}
+
 /** Explorer URL for the transaction a schedule executed, by consensus timestamp. */
 export function hashscanTimestampUrl(network: HederaNetwork, consensusTimestamp: string): string {
   return `${HASHSCAN_BASE[network]}/transaction/${consensusTimestamp}`

@@ -1,4 +1,4 @@
-import { MIRROR_BASE, type HederaNetwork } from './hedera'
+import { MIRROR_BASE, mirrorTransactionId, type HederaNetwork } from './hedera'
 import type { MirrorKeyObject } from './accountKey'
 import { secondsOfTimestamp } from './time'
 
@@ -121,7 +121,8 @@ export async function fetchMirrorTransactions(
   transactionId: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<MirrorTransactionRow[]> {
-  const url = `${MIRROR_BASE[network]}/transactions/${encodeURIComponent(transactionId)}`
+  // The mirror only accepts the dashed id; `@`/`.` is answered with HTTP 400.
+  const url = `${MIRROR_BASE[network]}/transactions/${encodeURIComponent(mirrorTransactionId(transactionId))}`
   const res = await fetchImpl(url, { headers: { accept: 'application/json' } })
   if (!res.ok) return []
   const body = (await res.json()) as { transactions?: RawMirrorTransaction[] }

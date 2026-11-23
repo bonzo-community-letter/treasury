@@ -9,7 +9,7 @@ import type { TreasuryKeyStructure } from '../lib/accountKey'
 import type { MirrorSchedule } from '../lib/mirror'
 import { signSchedule } from '../lib/transfer'
 import type { Role } from '../lib/roles'
-import { StatusBadge, type StatusTone } from './ui'
+import { Spinner, StatusBadge, type StatusTone } from './ui'
 
 interface Props {
   treasuryId: string
@@ -331,8 +331,9 @@ function SignButton({
       aria-label={`Sign schedule ${label}`}
       disabled={busy}
       onClick={onSign}
-      className="rounded-sm border border-accent bg-accent px-3 py-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-page transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
+      className="inline-flex items-center gap-1.5 rounded-sm border border-accent bg-accent px-3 py-1.5 text-[0.625rem] font-semibold uppercase tracking-[0.14em] text-page transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40"
     >
+      {busy ? <Spinner /> : null}
       {phase === 'submitting' ? 'Awaiting wallet…' : phase === 'receipt' ? 'Reading…' : 'Sign'}
     </button>
   )

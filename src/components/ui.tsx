@@ -33,6 +33,16 @@ export const monoInputClass = `${inputClass} font-mono text-[0.8125rem]`
 export const primaryAction =
   'rounded-sm border border-accent bg-accent px-5 py-2 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-page transition-opacity hover:opacity-85 disabled:cursor-not-allowed disabled:opacity-40'
 
+/** A turning ring for a wait the page owns — the button keeps its label. */
+export function Spinner({ className = '' }: { className?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={`inline-block h-3 w-3 shrink-0 animate-spin rounded-full border border-current border-t-transparent ${className}`}
+    />
+  )
+}
+
 export const secondaryAction =
   'rounded-sm border border-rule px-4 py-2 text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-ink-soft transition-colors hover:border-accent hover:text-ink'
 

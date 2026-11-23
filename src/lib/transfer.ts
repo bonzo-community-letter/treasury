@@ -5,6 +5,9 @@ import { describeSubmitError, getConnector, getSdkAndShared, sessionOf, WalletEr
 
 type SdkModule = typeof import('@hiero-ledger/sdk')
 
+/** How long a wallet may stay silent before the mirror is asked instead. */
+const WALLET_ANSWER_TIMEOUT_MS = 90_000
+
 /**
  * The only file in the app that builds transfers — direct and scheduled.
  *
@@ -74,15 +77,26 @@ async function submitThroughWallet(
   const transaction = build(sdk, session.accountId)
 
   stages.submitting?.()
-  await connector
+  // A wallet that answers nothing would leave the button spinning forever. The
+  // transaction already carries its own id, so a silent wallet is not the end
+  // of the story: the mirror can still say what happened to that id.
+  let walletError: unknown
+  const walletCall = connector
     .signAndExecuteTransaction({
       signerAccountId: `${config.profile.chainId}:${session.accountId}`,
       transactionList: shared.transactionToBase64String(transaction),
     })
     .catch((error: unknown) => {
-      if (error instanceof WalletError) throw error
-      throw new WalletError('unknown', describeSubmitError(error))
+      walletError = error
     })
+  await Promise.race([
+    walletCall,
+    new Promise<void>((resolve) => setTimeout(resolve, WALLET_ANSWER_TIMEOUT_MS)),
+  ])
+  if (walletError !== undefined) {
+    if (walletError instanceof WalletError) throw walletError
+    throw new WalletError('unknown', describeSubmitError(walletError))
+  }
 
   const txId = transaction.transactionId
   const transactionId = txId ? txId.toString() : ''
