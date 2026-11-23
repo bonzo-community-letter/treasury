@@ -475,10 +475,12 @@ export async function connect(kind: WalletKind, options: ConnectOptions = {}): P
             if (typeof document !== 'undefined') {
               document.addEventListener('visibilitychange', watchForApp)
             }
-            const onBack = (): void => {
-              if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-                appTookOver = true
-              }
+            // Only a page restored from the back-forward cache is a return from
+            // the app. A plain `pageshow` also fires when a scheme navigation
+            // fails, and treating that as "the app opened" would suppress the
+            // pairing code exactly when it is needed.
+            const onBack = (event: PageTransitionEvent): void => {
+              if (event.persisted) appTookOver = true
             }
             if (typeof window !== 'undefined') {
               window.addEventListener('pageshow', onBack)
