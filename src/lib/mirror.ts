@@ -318,6 +318,34 @@ export async function waitForTransaction(
   return null
 }
 
+/**
+ * The first row of a transaction, whatever its name — for transactions whose
+ * mirror name this page does not want to hardcode (a topic creation, say).
+ */
+export function waitForAnyTransaction(
+  network: HederaNetwork,
+  transactionId: string,
+  options: WaitOptions = {},
+): Promise<MirrorTransactionRow | null> {
+  const { budgetMs = 45_000, delayMs = 2_000, sleep = defaultSleep, fetchImpl = fetch, aborted = () => false } = options
+  const maxPolls = Math.max(1, Math.ceil(budgetMs / delayMs))
+  return (async () => {
+    for (let poll = 0; poll < maxPolls; poll += 1) {
+      if (aborted()) return null
+      try {
+        const rows = await fetchMirrorTransactions(network, transactionId, fetchImpl)
+        const match = rows.find((row) => row.result.length > 0)
+        if (match) return match
+      } catch {
+        // A flaky read is not an answer; keep polling until the budget says stop.
+      }
+      if (poll + 1 >= maxPolls) return null
+      await sleep(delayMs)
+    }
+    return null
+  })()
+}
+
 export function waitForCryptoCreate(
   network: HederaNetwork,
   transactionId: string,

@@ -62,6 +62,11 @@ export function mirrorTransactionId(transactionId: string): string {
   return transactionId.replace(/^(\d+\.\d+\.\d+)@(\d+)\.(\d+)$/, '$1-$2-$3')
 }
 
+/** Explorer URL for an HCS topic. */
+export function hashscanTopicUrl(network: HederaNetwork, topicId: string): string {
+  return `${HASHSCAN_BASE[network]}/topic/${topicId}`
+}
+
 /** Explorer URL for the transaction a schedule executed, by consensus timestamp. */
 export function hashscanTimestampUrl(network: HederaNetwork, consensusTimestamp: string): string {
   return `${HASHSCAN_BASE[network]}/transaction/${consensusTimestamp}`

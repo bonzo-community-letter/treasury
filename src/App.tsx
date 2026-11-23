@@ -14,9 +14,11 @@ import { TransactionsPanel } from './components/TransactionsPanel'
 import { SchedulesPanel } from './components/SchedulesPanel'
 import { CreateTreasuryPanel } from './components/CreateTreasuryPanel'
 import { TransferPanel } from './components/TransferPanel'
+import { TopicPanel } from './components/TopicPanel'
+import { NoAccessPanel } from './components/NoAccessPanel'
 import { SettingsDialog } from './components/SettingsDialog'
 
-type Tab = 'record' | 'new'
+type Tab = 'record' | 'new' | 'topic'
 
 /**
  * The treasury page. Two shapes, decided by configuration alone:
@@ -166,6 +168,9 @@ export function App() {
               <TabButton active={tab === 'new'} onClick={() => setTab('new')}>
                 New transaction
               </TabButton>
+              <TabButton active={tab === 'topic'} onClick={() => setTab('topic')}>
+                Create HCS topic
+              </TabButton>
             </nav>
 
             {tab === 'record' ? (
@@ -189,60 +194,41 @@ export function App() {
                   <p className="text-xs leading-relaxed text-ink-faint">{treasuryKey.error}</p>
                 ) : null}
               </>
+            ) : tab === 'new' ? (
+              canAct && treasuryKey.structure ? (
+                <TransferPanel
+                  treasuryId={treasuryId}
+                  structure={treasuryKey.structure}
+                  connectedAccountId={wallet.accountId as string}
+                  connectedKeyRaw={walletKey.singleRaw}
+                  balanceTinybars={snapshot.account?.balanceTinybars ?? null}
+                  usdPerHbar={price.price?.usdPerHbar ?? null}
+                />
+              ) : (
+                <NoAccessPanel
+                  step="New transaction"
+                  connectTitle="Connect a wallet to send from the treasury"
+                  action="create a transaction"
+                  connected={connected}
+                  canAct={canAct}
+                  accountId={wallet.accountId}
+                />
+              )
             ) : canAct && treasuryKey.structure ? (
-              <TransferPanel
-                treasuryId={treasuryId}
+              <TopicPanel
                 structure={treasuryKey.structure}
                 connectedAccountId={wallet.accountId as string}
-                connectedKeyRaw={walletKey.singleRaw}
-                balanceTinybars={snapshot.account?.balanceTinybars ?? null}
-                usdPerHbar={price.price?.usdPerHbar ?? null}
+                accountIds={signerAccounts}
               />
             ) : (
-              <section className="border border-rule bg-hero px-5 py-6 sm:px-8 sm:py-8">
-                <p className="eyebrow">New transaction</p>
-
-                {!connected ? (
-                  <>
-                    <h2 className="mt-2 font-serif text-2xl leading-tight text-ink">
-                      Connect a wallet to send from the treasury
-                    </h2>
-                    <p className="mt-2 max-w-[60ch] text-[0.9375rem] leading-relaxed text-ink-soft">
-                      Only the administrator and the treasury's signers can create a transaction.
-                      At a threshold of 1 the transfer is sent directly; above 1 it becomes a
-                      scheduled transaction and waits for the other signatures.
-                    </p>
-                  </>
-                ) : !canAct ? (
-                  <>
-                    <h2 className="mt-2 font-serif text-2xl leading-tight text-ink">
-                      This wallet has no treasury access
-                    </h2>
-                    <p className="mt-2 max-w-[60ch] text-[0.9375rem] leading-relaxed text-ink-soft">
-                      The connected account{' '}
-                      <span className="break-all font-mono text-[0.875rem] text-ink">
-                        {wallet.accountId}
-                      </span>{' '}
-                      holds none of this treasury's keys. A transfer out of the treasury is signed
-                      by one of those keys, so this wallet can neither create nor sign one — it can
-                      only read the page.
-                    </p>
-                    <p className="mt-3 max-w-[60ch] text-[0.9375rem] leading-relaxed text-ink-soft">
-                      Disconnect it in the bar above and connect the administrator wallet or one of
-                      the signers to create a transaction.
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <h2 className="mt-2 font-serif text-2xl leading-tight text-ink">
-                      Reading the treasury key…
-                    </h2>
-                    <p className="mt-2 max-w-[60ch] text-[0.9375rem] leading-relaxed text-ink-soft">
-                      The form appears as soon as the key structure is known.
-                    </p>
-                  </>
-                )}
-              </section>
+              <NoAccessPanel
+                step="Create HCS topic"
+                connectTitle="Connect a wallet to create a topic"
+                action="create a topic"
+                connected={connected}
+                canAct={canAct}
+                accountId={wallet.accountId}
+              />
             )}
           </>
         )}
