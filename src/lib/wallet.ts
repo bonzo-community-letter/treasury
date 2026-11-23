@@ -462,11 +462,39 @@ export async function connect(kind: WalletKind, options: ConnectOptions = {}): P
         await withTimeout(
           instance.connect((uri) => {
             options.onPairing?.(uri)
+            // Whether the app actually took over is the only question the
+            // fallback may ask. A page that was hidden and came back has
+            // already been answered by the app — opening the pairing code then
+            // covers the page the user just returned to, which is exactly what
+            // it must not do.
+            let appTookOver = false
+            const watchForApp = (): void => {
+              if (typeof document === 'undefined') return
+              if (document.visibilityState === 'hidden') appTookOver = true
+            }
+            if (typeof document !== 'undefined') {
+              document.addEventListener('visibilitychange', watchForApp)
+            }
+            const onBack = (): void => {
+              if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+                appTookOver = true
+              }
+            }
+            if (typeof window !== 'undefined') {
+              window.addEventListener('pageshow', onBack)
+            }
+
             window.location.href = deepLinkFor(link, uri)
+
             // A scheme that opens nothing leaves the user staring at the same
             // page. If this one is still in front after a moment, offer the
             // pairing code for the same URI instead of a dead end.
             setTimeout(() => {
+              if (typeof document !== 'undefined') {
+                document.removeEventListener('visibilitychange', watchForApp)
+              }
+              if (typeof window !== 'undefined') window.removeEventListener('pageshow', onBack)
+              if (appTookOver) return
               if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
               note('dialog')
               instance.walletConnectModal.openModal({ uri })
