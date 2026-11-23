@@ -121,7 +121,9 @@ export function StatusBadge({
       <span
         tabIndex={detail ? 0 : undefined}
         aria-label={detail ? `${label}: ${detail}` : label}
-        className={`border px-2 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-[0.14em] ${STATUS_TONE_CLASS[tone]}`}
+        // One width for every badge: in a table the status column is read down,
+        // and a pill that changes size with its word makes that impossible.
+        className={`inline-flex min-w-[5.5rem] items-center justify-center border px-2 py-0.5 text-center text-[0.5625rem] font-semibold uppercase tracking-[0.14em] ${STATUS_TONE_CLASS[tone]}`}
       >
         {label}
       </span>
