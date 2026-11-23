@@ -4,7 +4,9 @@ import {
   describeWalletError,
   disconnect as closeSessions,
   hasStoredSession,
+  rememberedExtension,
   restore,
+  restoreExtension,
   type ConnectRoute,
   type WalletKind,
 } from '../lib/wallet'
@@ -43,18 +45,36 @@ export function useWallet(): WalletApi {
   const attempt = useRef(0)
 
   useEffect(() => {
-    if (!hasStoredSession()) return
     let cancelled = false
 
-    setState({ ...IDLE, status: 'restoring' })
-    void restore().then((session) => {
+    const settle = (session: { accountId: string } | null): void => {
       if (cancelled || attempt.current !== 0) return
       setState(
         session
           ? { status: 'connected', accountId: session.accountId, kind: null, route: null, error: null }
           : IDLE,
       )
-    })
+    }
+
+    if (hasStoredSession()) {
+      // A WalletConnect session this browser already holds: pick it up quietly.
+      setState({ ...IDLE, status: 'restoring' })
+      void restore().then(settle)
+    } else {
+      // No stored pairing, but an extension may still hold one from an
+      // earlier visit. restoreExtension answers only when this browser used
+      // an extension before, so a first visit never opens a wallet prompt.
+      void restoreExtension().then((session) => {
+        if (cancelled || attempt.current !== 0 || !session) return
+        setState({
+          status: 'connected',
+          accountId: session.accountId,
+          kind: rememberedExtension(),
+          route: 'extension',
+          error: null,
+        })
+      })
+    }
 
     return () => {
       cancelled = true

@@ -336,6 +336,9 @@ export function hasStoredSession(): boolean {
 /** How long a pairing may stay unanswered before the UI lets go. */
 export const CONNECT_TIMEOUT_MS = 120_000
 
+/** A silent restore gives up quickly — nobody asked for it. */
+export const RESTORE_TIMEOUT_MS = 10_000
+
 export function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_, reject) => {
@@ -381,6 +384,7 @@ export async function connect(kind: WalletKind, options: ConnectOptions = {}): P
         CONNECT_TIMEOUT_MS,
         'The wallet did not answer in time. Please try again.',
       )
+      rememberExtension(kind)
     } else if (kind === 'walletconnect') {
       options.onRoute?.('dialog')
       await withTimeout(
@@ -434,12 +438,108 @@ export async function connect(kind: WalletKind, options: ConnectOptions = {}): P
 
 /** Close every session and pairing this page opened. */
 export async function disconnect(): Promise<void> {
+  forgetExtension()
   if (!pending) return
   const instance = await pending
   await instance.disconnectAll()
 }
 
-/** Pick up a session this browser already holds, without showing anything. */
+
+/**
+ * The one thing this page keeps in the browser: which wallet kind this
+ * browser last connected with through an extension. It is not a session and
+ * not a key — it only lets a reload ask that extension quietly whether the
+ * pairing still stands, instead of opening a wallet prompt for someone who
+ * never connected. The session itself stays with WalletConnect/the wallet.
+ */
+const EXTENSION_MARKER_KEY = 'treasury.wallet.extension'
+
+export function rememberedExtension(): WalletKind | null {
+  if (typeof localStorage === 'undefined') return null
+  try {
+    const value = localStorage.getItem(EXTENSION_MARKER_KEY)
+    return value === 'hashpack' || value === 'kabila' ? value : null
+  } catch {
+    return null
+  }
+}
+
+function rememberExtension(kind: WalletKind): void {
+  try {
+    localStorage.setItem(EXTENSION_MARKER_KEY, kind)
+  } catch {
+    // Private mode or a full quota: the reload simply will not restore.
+  }
+}
+
+function forgetExtension(): void {
+  try {
+    localStorage.removeItem(EXTENSION_MARKER_KEY)
+  } catch {
+    // Nothing to do — the marker is a convenience, not state.
+  }
+}
+
+/** An extension's answer to the query — top-level or inside an iframe. */
+export function isExtensionAnnouncement(data: unknown): boolean {
+  if (!data || typeof data !== 'object') return false
+  const message = data as { type?: unknown; metadata?: unknown }
+  const answer = message.type === 'hedera-extension-response' || message.type === 'hedera-iframe-query-response'
+  return answer && Boolean(message.metadata)
+}
+
+/**
+ * Ask the page whether a Hedera extension is installed, without loading the
+ * wallet libraries: the extension protocol is plain window messaging. A
+ * visitor without one pays 700 ms of a timer, not a megabyte of WalletConnect.
+ */
+export function probeExtension(budgetMs = 700): Promise<boolean> {
+  if (typeof window === 'undefined') return Promise.resolve(false)
+  return new Promise((resolve) => {
+    let settled = false
+    const finish = (found: boolean): void => {
+      if (settled) return
+      settled = true
+      window.removeEventListener('message', onMessage)
+      resolve(found)
+    }
+    const onMessage = (event: MessageEvent): void => {
+      if (isExtensionAnnouncement(event.data)) finish(true)
+    }
+    window.addEventListener('message', onMessage)
+    setTimeout(() => finish(false), budgetMs)
+    window.postMessage({ type: 'hedera-extension-query' }, '*')
+  })
+}
+
+/**
+ * Pick the session back up after a reload when the connection was made
+ * through an extension. Only attempted for a browser that connected that way
+ * before (the marker above), and only when the extension answers.
+ */
+export async function restoreExtension(): Promise<WalletSession | null> {
+  const kind = rememberedExtension()
+  if (!kind) return null
+  if (!(await probeExtension())) return null
+  try {
+    const instance = await connector()
+    const extension = await waitForExtension(instance, kind, 700)
+    if (!extension) return null
+    // A restore is a courtesy, not a request: it gets ten seconds, not two
+    // minutes, and a silent failure leaves the page exactly as it was.
+    await withTimeout(
+      instance.connectExtension(extension.id),
+      RESTORE_TIMEOUT_MS,
+      'The wallet did not answer in time.',
+    )
+    return sessionOf(instance)
+  } catch {
+    // Declined, closed, or no account on this network: stay disconnected.
+    return null
+  }
+}
+
+/** Pick up a WalletConnect session this browser already holds, without showing anything. */
 export async function restore(): Promise<WalletSession | null> {
   if (!hasStoredSession()) return null
   try {

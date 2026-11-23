@@ -6,7 +6,6 @@ import {
   buildTransferPlan,
   SCHEDULE_EXPIRY_DEFAULT_MINUTES,
   SCHEDULE_EXPIRY_OPTIONS,
-  thresholdHelper,
 } from '../lib/treasury'
 import {
   createScheduledTransfer,
@@ -106,7 +105,7 @@ export function TransferPanel({ treasuryId, structure, connectedAccountId, conne
 
   return (
     <Panel
-      step={scheduled ? `Signer · ${thresholdHelper(structure.threshold, structure.keys.length)}` : 'Signer · 1 of N'}
+      step="New transaction"
       title={scheduled ? 'Create a scheduled transfer' : 'Send from the treasury'}
       note={
         scheduled

@@ -162,7 +162,11 @@ deploys as read-only stats and says so quietly at the bottom.
 
 ## Security model
 
-- Static site, no backend, no analytics, no persistence of anything secret.
+- Static site, no backend, no analytics, no persistence of anything secret. The
+  browser keeps one flag — which wallet kind last connected through an
+  extension — so a reload can ask that extension quietly instead of opening a
+  prompt; WalletConnect keeps its own session records. No key, no phrase, no
+  transaction data is stored.
   Reads: the two mirror nodes and CoinGecko. Writes: only what a connected
   wallet signs.
 - CSP in the built meta tag allows exactly: `'self'` scripts/styles, the two
