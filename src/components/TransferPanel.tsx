@@ -4,9 +4,11 @@ import { hashscanScheduleUrl, hashscanTransactionUrl } from '../lib/hedera'
 import {
   buildSchedulePlan,
   buildTransferPlan,
+  formatHbar,
   hbarFromTinybarsForInput,
   SCHEDULE_EXPIRY_DEFAULT_MINUTES,
 } from '../lib/treasury'
+import { formatUsd } from '../lib/price'
 import {
   createScheduledTransfer,
   executeTransfer,
@@ -22,8 +24,10 @@ interface Props {
   structure: TreasuryKeyStructure
   connectedAccountId: string
   connectedKeyRaw: string | null
-  /** the treasury's balance, for the Max button */
+  /** the treasury's balance, for the Max button and the balance line */
   balanceTinybars: bigint | null
+  /** HBAR in dollars, for that same line; null while the rate is unknown */
+  usdPerHbar: number | null
 }
 
 type Phase = 'form' | 'submitting' | 'receipt' | 'done'
@@ -60,6 +64,7 @@ export function TransferPanel({
   connectedAccountId,
   connectedKeyRaw,
   balanceTinybars,
+  usdPerHbar,
 }: Props) {
   const [recipient, setRecipient] = useState('')
   const [amount, setAmount] = useState('')
@@ -83,6 +88,9 @@ export function TransferPanel({
   // the chain requires the other signatures too.
   const isTreasurySession = connectedAccountId === treasuryId
   const preflightOk = holdsKey || isTreasurySession
+
+  const balanceUsd =
+    balanceTinybars !== null && usdPerHbar !== null ? formatUsd(balanceTinybars, usdPerHbar) : null
 
   const fillMax = (): void => {
     if (balanceTinybars === null) return
@@ -212,6 +220,13 @@ export function TransferPanel({
                   Max
                 </button>
               </div>
+              <p className="mt-2 text-xs leading-relaxed text-ink-faint">
+                Balance{' '}
+                <span className="tnum text-ink-soft">
+                  {balanceTinybars === null ? '—' : formatHbar(balanceTinybars)}
+                </span>
+                {balanceUsd ? <> · {balanceUsd}</> : null}
+              </p>
             </label>
           </div>
 
