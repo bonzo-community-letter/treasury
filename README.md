@@ -90,11 +90,12 @@ this:
   tests).
 - `/transactions?account.id=` has no `transactiontype` filter — the app
   filters by `name` client-side.
-- `/schedules?account.id=` matches the schedule **creator only**. Payer-only
-  and accounts mentioned inside the scheduled body return empty. So the
-  pending list searches the treasury's creators it knows (configured treasuries
-  + admin + connected wallet) and then keeps only schedules whose decoded body
-  debits the treasury. The panel says which creators were searched.
+- `/schedules?account.id=` matches the schedule **creator only**; there is no
+  filter for the accounts a scheduled transfer touches (`creator_account_id`
+  and `payer_account_id` are rejected as unknown parameters). A schedule that
+  moves the treasury's funds is created by a signer's wallet, so the pending
+  list asks the treasury and every account holding one of its keys, then keeps
+  only schedules whose decoded body debits the treasury.
 - A schedule row has no recipient or amount fields — those live in
   `transaction_body` (base64 `proto.SchedulableTransactionBody`), which the
   app decodes.

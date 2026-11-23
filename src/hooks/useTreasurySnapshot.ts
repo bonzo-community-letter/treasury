@@ -21,8 +21,6 @@ export interface TreasurySnapshot {
   transactions: MirrorTransactionRow[]
   /** schedules whose decoded body debits this treasury, deduped */
   schedules: MirrorSchedule[]
-  /** the schedule creators this snapshot searched (see discovery note) */
-  searchedCreators: string[]
   updatedMs: number | null
   loading: boolean
   error: string | null
@@ -32,7 +30,6 @@ const EMPTY: TreasurySnapshot = {
   account: null,
   transactions: [],
   schedules: [],
-  searchedCreators: [],
   updatedMs: null,
   loading: false,
   error: null,
@@ -43,11 +40,10 @@ const EMPTY: TreasurySnapshot = {
  * and on demand. The pieces arrive together (parallel, allSettled): a slow
  * leg cannot blank out the balance.
  *
- * Schedule discovery is deliberately explicit (see README): the mirror
- * indexes a schedule only by its CREATOR, so the pending list is the union
- * of schedules created by the treasury account, the admin account, and the
- * connected wallet — filtered to those whose decoded body debits the
- * treasury.
+ * Schedule discovery: the mirror indexes a schedule only by its CREATOR, so
+ * the pending list is the union of schedules created by the treasury and by
+ * the accounts that hold its keys — filtered to those whose decoded body
+ * debits the treasury.
  */
 export function useTreasurySnapshot(
   treasuryId: string | null,
@@ -95,12 +91,17 @@ export function useTreasurySnapshot(
         ]
       }
 
+      // Creators worth asking: the treasury itself, and every account that
+      // holds one of its keys (a schedule is created by a signer's wallet).
+      // The connected wallet is the fallback when no key could be resolved.
       const creators = [
         ...new Set([
           treasuryId,
-          config.adminAccount,
-          ...(connectedAccountId ? [connectedAccountId] : []),
-          ...signerAccounts,
+          ...(signerAccounts.length > 0
+            ? signerAccounts
+            : connectedAccountId
+              ? [connectedAccountId]
+              : []),
         ]),
       ]
       const scheduleResults = await Promise.allSettled(
@@ -123,7 +124,6 @@ export function useTreasurySnapshot(
         account: accountValue ?? prev.account,
         transactions: transactionsValue.slice(0, SHOW_N * 2),
         schedules,
-        searchedCreators: creators,
         updatedMs: Date.now(),
         loading: false,
         error:

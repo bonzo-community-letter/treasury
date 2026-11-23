@@ -25,8 +25,6 @@ interface Props {
   /** the connected wallet's raw key, when it is readable and single */
   connectedKeyRaw: string | null
   nowSec: number
-  /** creators actually searched — shown so the visitor knows the scope */
-  searchedCreators: string[]
   onSigned: () => void
 }
 
@@ -52,7 +50,6 @@ export function SchedulesPanel({
   role,
   connectedKeyRaw,
   nowSec,
-  searchedCreators,
   onSigned,
 }: Props) {
   if (!structure) {
@@ -103,8 +100,8 @@ export function SchedulesPanel({
 
       {views.length > 0 ? (
         <p className="mt-5 text-xs leading-relaxed text-ink-faint">
-          Schedules are indexed by creator. Searched:{' '}
-          {searchedCreators.length > 1 ? searchedCreators.join(', ') : searchedCreators[0]}.
+          Schedules are indexed by creator; this list covers the treasury and the accounts holding
+          its keys.
         </p>
       ) : null}
     </section>
@@ -230,6 +227,7 @@ function ResolvedRow({ view }: { view: PendingScheduleView }) {
     status === 'executed' ? (
       <>
         Executed — {formatHbar(transfer.amountOutTinybars)} to{' '}
+        <span className="font-mono text-xs">{transfer.recipient}</span>.{' '}
         <a
           href={
             view.executedTimestamp
@@ -240,9 +238,8 @@ function ResolvedRow({ view }: { view: PendingScheduleView }) {
           rel="noreferrer"
           className="underline decoration-rule underline-offset-4 transition-colors hover:decoration-accent"
         >
-          the transaction
+          HashScan
         </a>
-        .
       </>
     ) : status === 'expired' ? (
       <>Expired unsigned after {view.collected} of {view.threshold} signatures — nothing moved.</>

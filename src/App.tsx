@@ -182,7 +182,6 @@ export function App() {
                   role={role}
                   connectedKeyRaw={walletKey.singleRaw}
                   nowSec={nowSec}
-                  searchedCreators={snapshot.searchedCreators}
                   onSigned={snapshot.refresh}
                 />
 
