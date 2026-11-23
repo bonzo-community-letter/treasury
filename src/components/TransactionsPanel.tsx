@@ -24,7 +24,7 @@ export function TransactionsPanel({ treasuryId, rows }: Props) {
   return (
     <section className="border border-rule bg-hero px-5 py-6 sm:px-8 sm:py-8">
       <p className="eyebrow">Recent transactions</p>
-      <h2 className="mt-2 font-serif text-2xl leading-tight text-ink">Last 15 on the account</h2>
+      <h2 className="mt-2 font-serif text-2xl leading-tight text-ink">Latest 15</h2>
 
       {summaries.length === 0 ? (
         <p className="mt-4 text-sm text-ink-soft">Nothing indexed yet.</p>

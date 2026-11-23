@@ -85,8 +85,8 @@ export function App() {
           </h1>
           <p className="mt-5 max-w-[52ch] text-base leading-relaxed text-ink-soft">
             {treasuryId
-              ? 'The account two people hold, one key each. Anyone can read it; moving HBAR out of it takes a signature.'
-              : 'One account, held by its signers. It is created once, with the signer keys and a threshold.'}
+              ? 'Balance, transactions and scheduled transfers, read from the public mirror node.'
+              : 'The treasury account does not exist yet. It is created once, with its signer keys and a threshold.'}
           </p>
           {treasuryId ? (
             <p className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs text-ink-faint">
@@ -127,14 +127,14 @@ export function App() {
               <p className="eyebrow">Treasury</p>
               <h2 className="mt-2 font-serif text-2xl leading-tight text-ink">No treasury yet</h2>
               <p className="mt-2 max-w-[60ch] text-[0.9375rem] leading-relaxed text-ink-soft">
-                The treasury is created once, by the administrator{' '}
-                <span className="font-mono text-[0.8125rem]">{config.adminAccount}</span>, with the
-                signer keys and a threshold. Connect that wallet to create it.
+                Only the administrator,{' '}
+                <span className="font-mono text-[0.8125rem]">{config.adminAccount}</span>, can
+                create it. Connect that wallet to continue.
               </p>
               {connected ? (
                 <p className="mt-3 text-xs leading-relaxed text-ink-faint">
-                  This wallet is <span className="font-mono">{wallet.accountId}</span> — not the
-                  administrator, so it cannot create the treasury.
+                  Connected wallet: <span className="font-mono">{wallet.accountId}</span> (not the
+                  administrator).
                 </p>
               ) : null}
             </section>
@@ -160,7 +160,7 @@ export function App() {
 
             <nav className="flex items-center gap-6 border-b border-rule/60" aria-label="Views">
               <TabButton active={tab === 'record'} onClick={() => setTab('record')}>
-                The record
+                Overview
               </TabButton>
               <TabButton active={tab === 'new'} onClick={() => setTab('new')}>
                 New transaction
@@ -201,12 +201,12 @@ export function App() {
               <section className="border border-rule bg-hero px-5 py-6 sm:px-8 sm:py-8">
                 <p className="eyebrow">New transaction</p>
                 <h2 className="mt-2 font-serif text-2xl leading-tight text-ink">
-                  A key of this treasury is needed
+                  A treasury key is required
                 </h2>
                 <p className="mt-2 max-w-[60ch] text-[0.9375rem] leading-relaxed text-ink-soft">
-                  Moving HBAR out is signed by one of the treasury's keys. Connect a wallet that
-                  holds one — at 1 of {treasuryKey.structure?.keys.length ?? 2} a single signer can
-                  act; above that the transfer becomes a scheduled transaction the threshold signs.
+                  Sending from this account is signed by one of its keys. Connect a wallet that
+                  holds one. At a threshold of 1 the transfer is sent directly; above 1 it becomes
+                  a scheduled transaction.
                 </p>
               </section>
             )}
@@ -215,8 +215,8 @@ export function App() {
 
         {!walletReady ? (
           <p className="text-xs leading-relaxed text-ink-faint">
-            Wallet connection is not configured for this build — set the WalletConnect project id
-            (see <code>.env.example</code>). Everything above stays readable without it.
+            No WalletConnect project id in this build; the wallet is unavailable. Reading the
+            account still works.
           </p>
         ) : null}
       </main>

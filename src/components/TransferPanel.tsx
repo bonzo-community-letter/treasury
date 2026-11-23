@@ -107,18 +107,18 @@ export function TransferPanel({ treasuryId, structure, connectedAccountId, conne
   return (
     <Panel
       step={scheduled ? `Signer · ${thresholdHelper(structure.threshold, structure.keys.length)}` : 'Signer · 1 of N'}
-      title={scheduled ? 'Propose a scheduled transfer' : 'Send from the treasury'}
+      title={scheduled ? 'Create a scheduled transfer' : 'Send from the treasury'}
       note={
         scheduled
-          ? `This wraps the transfer in a schedule and waits for ${structure.threshold} of ${structure.keys.length} signatures before the network runs it. You pay only the schedule fee now.`
-          : 'A single signature moves this treasury. Your wallet pays the fee and its key satisfies the treasury key.'
+          ? `The transfer is created as a schedule. The network executes it after ${structure.threshold} of ${structure.keys.length} signatures. This wallet pays the schedule fee.`
+          : 'One signature sends this transfer. This wallet pays the fee.'
       }
     >
       {!preflightOk ? (
         <div className="space-y-4">
           <ErrorNote>
-            This wallet's key is not in the treasury's key list — the network will not count its
-            signature. The form stays open in case the chain has changed since this page read it.
+            This wallet's key is not in the treasury's key list. The network will not accept its
+            signature.
           </ErrorNote>
         </div>
       ) : null}
@@ -168,8 +168,8 @@ export function TransferPanel({ treasuryId, structure, connectedAccountId, conne
                 ))}
               </select>
               <p className="mt-2 text-xs leading-relaxed text-ink-faint">
-                The network expires the schedule if the {structure.threshold} of{' '}
-                {structure.keys.length} signatures do not arrive in time — nothing moves.
+                The schedule expires if the {structure.threshold} of {structure.keys.length}{' '}
+                signatures are not collected in time.
               </p>
             </label>
           ) : null}
@@ -199,13 +199,13 @@ export function TransferPanel({ treasuryId, structure, connectedAccountId, conne
                     ? 'Create the schedule'
                     : 'Send the transfer'}
             </button>
-            <span className="text-xs text-ink-faint">Paying wallet: <span className="font-mono">{connectedAccountId}</span></span>
+            <span className="text-xs text-ink-faint">Fee payer: <span className="font-mono">{connectedAccountId}</span></span>
           </div>
 
           {scheduled ? (
             <Note>
-              After this, the other signers connect and press “Sign this schedule” under Pending —
-              the network executes once the threshold signs, or lets it expire.
+              The other signers sign it under Scheduled transfers. The network executes it when
+              the threshold is reached, or the schedule expires.
             </Note>
           ) : null}
         </div>
@@ -225,8 +225,8 @@ function OutcomeLine({ outcome, scheduled, scheduleId }: { outcome: SubmitOutcom
   if (outcome.kind === 'unverified') {
     return (
       <Note>
-        Your wallet answered; the mirror has not indexed it yet. Check the explorer before
-        assuming anything moved.{' '}
+        The wallet answered; the mirror has not indexed the transaction yet. Check the
+        explorer.{' '}
         <a href={hashscanTransactionUrl(config.network, outcome.transactionId)} target="_blank" rel="noreferrer" className="underline decoration-rule underline-offset-4 hover:decoration-accent">
           HashScan
         </a>

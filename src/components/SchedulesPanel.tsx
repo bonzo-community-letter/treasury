@@ -59,7 +59,7 @@ export function SchedulesPanel({
     return (
       <section className="border border-rule bg-hero px-5 py-6 sm:px-8 sm:py-8">
         <p className="eyebrow">Scheduled transfers</p>
-        <p className="mt-4 text-sm text-ink-soft">The treasury key is still being read from the chain.</p>
+        <p className="mt-4 text-sm text-ink-soft">Reading the treasury key…</p>
       </section>
     )
   }
@@ -81,7 +81,7 @@ export function SchedulesPanel({
 
       {pending.length === 0 && resolved.length === 0 ? (
         <p className="mt-4 text-sm leading-relaxed text-ink-soft">
-          A transfer that needs more than one signature waits here until the threshold signs.
+          Scheduled transfers stay here until their threshold signs.
         </p>
       ) : null}
 
@@ -103,8 +103,8 @@ export function SchedulesPanel({
 
       {views.length > 0 ? (
         <p className="mt-5 text-xs leading-relaxed text-ink-faint">
-          Schedules are indexed by the network only under the account that created them; this list
-          searches {searchedCreators.length > 1 ? searchedCreators.join(', ') : searchedCreators[0]}.
+          Schedules are indexed by creator. Searched:{' '}
+          {searchedCreators.length > 1 ? searchedCreators.join(', ') : searchedCreators[0]}.
         </p>
       ) : null}
     </section>

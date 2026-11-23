@@ -72,9 +72,10 @@ export function SettingsDialog({
           Change the treasury key
         </h2>
         <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-          Who signs and how many of them must. The account keeps its id{' '}
-          <span className="font-mono text-[0.8125rem]">{treasuryId}</span> and its balance; the
-          update is signed by the key it holds now — {structure.threshold} of {structure.keys.length}.
+          Signers and threshold. The account id{' '}
+          <span className="font-mono text-[0.8125rem]">{treasuryId}</span> and the balance stay
+          unchanged. The update is signed by the current key ({structure.threshold} of{' '}
+          {structure.keys.length}).
         </p>
 
         <div className="mt-5">

@@ -70,7 +70,7 @@ export function CreateTreasuryPanel({ onCreated }: { onCreated: (accountId: stri
 
   if (phase === 'done' && outcome) {
     return (
-      <Panel step="Treasury created" title={outcome.kind === 'created' ? 'The account is on chain' : 'Not created'}>
+      <Panel step="Treasury created" title={outcome.kind === 'created' ? 'Treasury created' : 'Not created'}>
         {outcome.kind === 'created' ? (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-3">
@@ -90,8 +90,8 @@ export function CreateTreasuryPanel({ onCreated }: { onCreated: (accountId: stri
             </p>
             <div>
               <p className="mb-2 text-sm text-ink-soft">
-                Pin the id into the config on the next deploy — the discovery list will also find
-                it, but a pinned id survives anything that touches the admin account:
+                Add the id to the repository variable{' '}
+                <code className="font-mono">VITE_TREASURY_ACCOUNTS</code> and deploy again:
               </p>
               <div className="flex flex-wrap items-center gap-3">
                 <code className="break-all border border-rule bg-page px-3 py-2 font-mono text-xs text-ink-soft">
@@ -101,9 +101,9 @@ export function CreateTreasuryPanel({ onCreated }: { onCreated: (accountId: stri
               </div>
             </div>
             <p className="text-xs leading-relaxed text-ink-faint">
-              Each signer imports their key in HashPack (I already have a wallet → import recovery
-              phrase → enter account ID {outcome.account.accountId}). Every transaction will need
-              the threshold to sign.
+              Signers import the account in HashPack: I already have a wallet → import recovery
+              phrase → account ID {outcome.account.accountId}. Transactions need the threshold to
+              sign.
             </p>
           </div>
         ) : (
@@ -113,12 +113,12 @@ export function CreateTreasuryPanel({ onCreated }: { onCreated: (accountId: stri
                 ? outcome.transactionId
                   ? `The network refused the create: ${outcome.status}.`
                   : outcome.status
-                : 'The wallet answered but the mirror could not confirm. Check the explorer before retrying.'}
+                : 'The wallet answered; the mirror has not indexed the transaction yet. Check the explorer.'}
             </ErrorNote>
             {outcome.kind === 'unverified' && outcome.accountId ? (
               <p className="text-sm text-ink-soft">
-                The wallet reported account <span className="font-mono">{outcome.accountId}</span> —
-                verify it on HashScan before pinning anything.
+                The wallet reported account <span className="font-mono">{outcome.accountId}</span>.
+                Verify it on HashScan before adding it to the configuration.
               </p>
             ) : null}
             <button type="button" onClick={() => setPhase('form')} className={primaryAction}>
@@ -134,7 +134,7 @@ export function CreateTreasuryPanel({ onCreated }: { onCreated: (accountId: stri
     <Panel
       step="Admin · new treasury"
       title="Create a treasury account"
-      note="A new Hedera account whose key is a threshold over the signer keys below. Your connected wallet pays the fee and any initial balance."
+      note="A new Hedera account whose key is the threshold over the signer keys below. The connected wallet pays the fee and the initial balance."
     >
       <div className="space-y-5">
         <div>

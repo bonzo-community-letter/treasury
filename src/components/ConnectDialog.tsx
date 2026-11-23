@@ -96,8 +96,7 @@ export function ConnectDialog({ open, onClose, wallet }: Props) {
           <>
             <p className="mt-4 break-all font-mono text-sm text-ink-soft">{wallet.accountId}</p>
             <p className="mt-2 text-xs leading-relaxed text-ink-faint">
-              This account pays the fee of any transaction it submits. The page never sees a
-              private key.
+              This account pays the fee of the transactions it submits.
             </p>
             <div className="mt-6 flex items-center justify-between gap-3">
               <button
@@ -148,8 +147,7 @@ export function ConnectDialog({ open, onClose, wallet }: Props) {
         ) : (
           <>
             <p className="mt-2 text-sm leading-relaxed text-ink-soft">
-              Your wallet approves one request per action and pays its fee. This page never sees a
-              private key.
+              The wallet signs each transaction and pays its fee. The page never sees a private key.
             </p>
 
             <ul className="mt-5 space-y-2">

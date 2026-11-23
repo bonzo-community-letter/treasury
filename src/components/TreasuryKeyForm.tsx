@@ -115,7 +115,7 @@ export function TreasuryKeyForm({
     return outcome.kind === 'updated' ? (
       <div className="space-y-3">
         <p className="text-sm leading-relaxed text-ink-soft">
-          Receipt: {outcome.status} — the treasury now answers to the key listed above.
+          Receipt: {outcome.status}. The key is updated.
         </p>
         <a
           href={hashscanTransactionUrl(config.network, outcome.transactionId)}
@@ -126,8 +126,8 @@ export function TreasuryKeyForm({
           {outcome.transactionId} ↗
         </a>
         <p className="text-xs leading-relaxed text-ink-faint">
-          Every signer imports their key in HashPack (I already have a wallet → import recovery
-          phrase → enter account ID {treasuryId}). The change is read back from the chain.
+          Signers import the account in HashPack: I already have a wallet → import recovery phrase
+          → account ID {treasuryId}.
         </p>
       </div>
     ) : (
@@ -210,13 +210,13 @@ export function TreasuryKeyForm({
       {!singleSigner ? (
         <ErrorNote>
           This treasury is {structure.threshold} of {structure.keys.length}. Changing its key needs{' '}
-          {structure.threshold} signatures on one transaction, and one wallet session can supply
-          only its own — so the change has to be made with the SDK until the treasury is 1 of n.
+          {structure.threshold} signatures in one transaction; one wallet session provides one. Use
+          the SDK until the treasury is 1 of n.
         </ErrorNote>
       ) : !holdsCurrentKey ? (
         <ErrorNote>
-          The update is signed by the treasury's current key, and the connected wallet holds none of
-          its {structure.keys.length} keys. Connect a wallet whose key is in the list.
+          The update must be signed by a current treasury key. The connected wallet holds none of the{' '}
+          {structure.keys.length}.
         </ErrorNote>
       ) : null}
 
