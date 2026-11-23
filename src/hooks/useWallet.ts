@@ -5,7 +5,9 @@ import {
   disconnect as closeSessions,
   hasConnectedBefore,
   hasStoredSession,
+  isWalletReturn,
   restore,
+  RETURN_PARAM,
   type ConnectRoute,
   type WalletKind,
 } from '../lib/wallet'
@@ -23,6 +25,18 @@ export interface WalletState {
 }
 
 const IDLE: WalletState = { status: 'idle', accountId: null, kind: null, route: null, error: null }
+
+/** How long the page waits for a session after a wallet app sent the user back. */
+const RETURN_WAIT_MS = 20_000
+
+/** Drop the marker from the address bar, so a reload does not wait again. */
+function clearReturnMarker(): void {
+  if (typeof location === 'undefined' || typeof history === 'undefined') return
+  const url = new URL(location.href)
+  if (!url.searchParams.has(RETURN_PARAM)) return
+  url.searchParams.delete(RETURN_PARAM)
+  history.replaceState(null, '', url.toString())
+}
 
 export interface WalletApi extends WalletState {
   connect: (kind: WalletKind) => Promise<void>
@@ -58,10 +72,15 @@ export function useWallet(): WalletApi {
     // A session this browser already holds is read back, never re-negotiated:
     // connector init rebuilds the signers from storage, and a wallet is not
     // asked anything. A browser that connected before (WalletConnect's own
-    // storage, or an extension it used) is the only one that pays for it.
-    if (!hasStoredSession() && !hasConnectedBefore()) return
+    // storage, or an extension it used) is the only one that pays for it —
+    // plus the one a wallet app has just sent back here.
+    const returning = isWalletReturn()
+    if (!hasStoredSession() && !hasConnectedBefore() && !returning) return
     setState({ ...IDLE, status: 'restoring' })
-    void restore().then(settle)
+    void restore(returning ? { waitMs: RETURN_WAIT_MS } : {}).then((session) => {
+      settle(session)
+      if (returning) clearReturnMarker()
+    })
 
     return () => {
       cancelled = true

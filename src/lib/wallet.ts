@@ -127,28 +127,56 @@ const REGISTRY: Partial<Record<WalletKind, { search: string; slug: string; name:
   kabila: { search: 'kabila', slug: 'kabila-wallet', name: 'kabila' },
 }
 
-/** The wallet's mobile link, or null when the registry cannot be read. */
-export async function walletLink(
+export interface WalletLinks {
+  /** The app's own scheme, e.g. `hashpack:` — opens the app itself. */
+  native: string | null
+  /** The https landing page — opens a website, where the app is one tap away. */
+  universal: string | null
+}
+
+/** Both mobile links the registry publishes, or two nulls. */
+export async function walletLinks(
   kind: WalletKind,
   projectId: string,
   fetchImpl: typeof fetch = fetch,
-): Promise<string | null> {
+): Promise<WalletLinks> {
+  const none: WalletLinks = { native: null, universal: null }
   const entry = REGISTRY[kind]
-  if (!entry || !projectId) return null
+  if (!entry || !projectId) return none
   try {
     const url = `${EXPLORER_URL}?projectId=${encodeURIComponent(projectId)}&entries=10&search=${encodeURIComponent(entry.search)}`
     const res = await fetchImpl(url, { headers: { accept: 'application/json' } })
-    if (!res.ok) return null
+    if (!res.ok) return none
     const body = (await res.json()) as { listings?: Record<string, ExplorerListing> }
     const listings = Object.values(body.listings ?? {})
     const match =
       listings.find((listing) => listing.slug === entry.slug) ??
       listings.find((listing) => listing.name?.toLowerCase() === entry.name)
-    const link = match?.mobile?.universal || match?.mobile?.native
-    return typeof link === 'string' && link.length > 0 ? link : null
+    const clean = (value: string | undefined): string | null =>
+      typeof value === 'string' && value.length > 0 ? value : null
+    return {
+      native: clean(match?.mobile?.native),
+      universal: clean(match?.mobile?.universal),
+    }
   } catch {
-    return null
+    return none
   }
+}
+
+/**
+ * The link to open on a phone: the wallet's own scheme, because that opens the
+ * app in one step. The registry's https link lands on the wallet's *website*
+ * first — the user then has to find "open app" there, and stays on that site
+ * afterwards. The universal link stays as the fallback for wallets that
+ * publish nothing else.
+ */
+export async function walletLink(
+  kind: WalletKind,
+  projectId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<string | null> {
+  const links = await walletLinks(kind, projectId, fetchImpl)
+  return links.native ?? links.universal
 }
 
 /**
@@ -158,8 +186,10 @@ export async function walletLink(
  */
 export function deepLinkFor(link: string, uri: string): string {
   const encoded = encodeURIComponent(uri)
-  if (/^https?:/i.test(link)) return `${link.replace(/\/+$/, '')}/wc?uri=${encoded}`
-  return `${link}${link.endsWith(':') ? '//' : '/'}wc?uri=${encoded}`
+  const base = link.replace(/\/+$/, '')
+  if (/^https?:/i.test(base)) return `${base}/wc?uri=${encoded}`
+  // `hashpack:`, `hashpack://` and `hashpack://host` all become `hashpack://wc?uri=…`.
+  return `${base}//wc?uri=${encoded}`
 }
 
 /** Whether to deep-link or to show the pairing code. */
@@ -249,12 +279,20 @@ async function createConnector(): Promise<DAppConnector> {
       ? 'http://127.0.0.1:5173/'
       : new URL(import.meta.env.BASE_URL, location.origin).toString()
 
+  // The wallet returns the user here once the session is approved. Without
+  // this the phone stays on the wallet's own page and the dApp never learns
+  // the answer until it is opened by hand. The marker tells the page it was
+  // reached that way, so it may wait for the session instead of assuming none.
+  const returnUrl = new URL(pageUrl)
+  returnUrl.searchParams.set(RETURN_PARAM, 'return')
+
   const metadata = {
     name: 'Open Letter Treasury',
     description:
       'Public treasury stats and signer tools. Every transaction is signed and paid by your wallet; this page holds no key.',
     url: pageUrl,
     icons: [new URL('icon-256.png', pageUrl).toString()],
+    redirect: { universal: returnUrl.toString() },
   }
 
   const ledgerId = config.network === 'mainnet' ? sdk.LedgerId.MAINNET : sdk.LedgerId.TESTNET
@@ -342,6 +380,18 @@ export const CONNECT_TIMEOUT_MS = 120_000
 /** A silent restore gives up quickly — nobody asked for it. */
 export const RESTORE_TIMEOUT_MS = 10_000
 
+/** How long the page waits for a wallet app to take over before offering the code. */
+export const APP_OPEN_GRACE_MS = 2_500
+
+/** The query parameter a wallet app is told to come back with. */
+export const RETURN_PARAM = 'wallet'
+
+/** Whether this page load is a wallet app sending the user back. */
+export function isWalletReturn(search?: string): boolean {
+  const query = search ?? (typeof location === 'undefined' ? '' : location.search)
+  return new URLSearchParams(query).get(RETURN_PARAM) === 'return'
+}
+
 export function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<never>((_, reject) => {
@@ -407,6 +457,14 @@ export async function connect(kind: WalletKind, options: ConnectOptions = {}): P
           instance.connect((uri) => {
             options.onPairing?.(uri)
             window.location.href = deepLinkFor(link, uri)
+            // A scheme that opens nothing leaves the user staring at the same
+            // page. If this one is still in front after a moment, offer the
+            // pairing code for the same URI instead of a dead end.
+            setTimeout(() => {
+              if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+              options.onRoute?.('dialog')
+              instance.walletConnectModal.openModal({ uri })
+            }, APP_OPEN_GRACE_MS)
           }),
           CONNECT_TIMEOUT_MS,
           'The wallet did not answer in time. Please try again.',
@@ -494,10 +552,21 @@ export function hasConnectedBefore(): boolean {
  * stored session, and `sessionOf` answers from that. When nothing is stored,
  * this answers null and the page stays disconnected.
  */
-export async function restore(): Promise<WalletSession | null> {
-  if (!hasStoredSession() && !hasConnectedBefore()) return null
+export async function restore(options: { waitMs?: number } = {}): Promise<WalletSession | null> {
+  if (!hasStoredSession() && !hasConnectedBefore() && !options.waitMs) return null
   try {
-    return sessionOf(await connector())
+    const instance = await connector()
+    const found = sessionOf(instance)
+    if (found || !options.waitMs) return found
+    // Coming back from a wallet app: the approval may still be on its way, so
+    // wait for the session instead of answering "not connected" too early.
+    const deadline = Date.now() + options.waitMs
+    for (;;) {
+      if (Date.now() >= deadline) return null
+      await new Promise((resolve) => setTimeout(resolve, 300))
+      const session = sessionOf(instance)
+      if (session) return session
+    }
   } catch {
     return null
   }
