@@ -3,10 +3,9 @@ import {
   connect as openSession,
   describeWalletError,
   disconnect as closeSessions,
+  hasConnectedBefore,
   hasStoredSession,
-  rememberedExtension,
   restore,
-  restoreExtension,
   type ConnectRoute,
   type WalletKind,
 } from '../lib/wallet'
@@ -56,25 +55,13 @@ export function useWallet(): WalletApi {
       )
     }
 
-    if (hasStoredSession()) {
-      // A WalletConnect session this browser already holds: pick it up quietly.
-      setState({ ...IDLE, status: 'restoring' })
-      void restore().then(settle)
-    } else {
-      // No stored pairing, but an extension may still hold one from an
-      // earlier visit. restoreExtension answers only when this browser used
-      // an extension before, so a first visit never opens a wallet prompt.
-      void restoreExtension().then((session) => {
-        if (cancelled || attempt.current !== 0 || !session) return
-        setState({
-          status: 'connected',
-          accountId: session.accountId,
-          kind: rememberedExtension(),
-          route: 'extension',
-          error: null,
-        })
-      })
-    }
+    // A session this browser already holds is read back, never re-negotiated:
+    // connector init rebuilds the signers from storage, and a wallet is not
+    // asked anything. A browser that connected before (WalletConnect's own
+    // storage, or an extension it used) is the only one that pays for it.
+    if (!hasStoredSession() && !hasConnectedBefore()) return
+    setState({ ...IDLE, status: 'restoring' })
+    void restore().then(settle)
 
     return () => {
       cancelled = true
