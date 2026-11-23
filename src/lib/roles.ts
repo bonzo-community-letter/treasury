@@ -36,5 +36,3 @@ export function resolveRole(input: RoleInput): Role {
   return 'visitor'
 }
 
-/** The sentence the stats layer shows a connected non-key-holder. */
-export const VISITOR_NOTE = 'This wallet holds no key of this treasury. Read-only.'

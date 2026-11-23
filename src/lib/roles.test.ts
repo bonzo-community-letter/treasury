@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { VISITOR_NOTE, resolveRole } from './roles'
+import { resolveRole } from './roles'
 import { treasuryKey, type TreasuryKeyStructure } from './accountKey'
 
 const keyA = treasuryKey('ed25519', new Uint8Array(32).fill(0xaa))
@@ -44,7 +44,4 @@ describe('resolveRole — the chain decides, not the config', () => {
     ).toBe('visitor')
   })
 
-  it('the visitor note says it plainly', () => {
-    expect(VISITOR_NOTE).toMatch(/no key/i)
-  })
 })

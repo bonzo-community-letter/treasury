@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { config, urlAccountOverride, walletReady } from './config'
-import { resolveRole, VISITOR_NOTE } from './lib/roles'
+import { resolveRole } from './lib/roles'
 import { hashscanAccountUrl } from './lib/hedera'
 import { useAccountKey } from './hooks/useAccountKey'
 import { useKeyAccounts } from './hooks/useKeyAccounts'
@@ -15,7 +15,6 @@ import { SchedulesPanel } from './components/SchedulesPanel'
 import { CreateTreasuryPanel } from './components/CreateTreasuryPanel'
 import { TransferPanel } from './components/TransferPanel'
 import { SettingsDialog } from './components/SettingsDialog'
-import { Note } from './components/ui'
 
 type Tab = 'record' | 'new'
 
@@ -172,8 +171,6 @@ export function App() {
             {tab === 'record' ? (
               <>
                 <BalanceCard snapshot={snapshot} price={price} />
-
-                {connected && role === 'visitor' && !walletKey.loading ? <Note>{VISITOR_NOTE}</Note> : null}
 
                 <TransactionsPanel treasuryId={treasuryId} rows={snapshot.transactions} />
 

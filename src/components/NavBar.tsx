@@ -66,7 +66,10 @@ export function NavBar({
 
 /** Which side of the treasury this wallet is on — set in the bar's own small caps. */
 export function RoleLabel({ role }: { role: Role }) {
-  const tone = role === 'admin' ? 'text-accent' : role === 'signer' ? 'text-ink-soft' : 'text-ink-faint'
-  const word = role === 'admin' ? 'Administrator' : role === 'signer' ? 'Signer' : 'No key'
+  // A wallet without a treasury key is not an error, but it is worth naming in
+  // the same colour the page uses for what matters.
+  const tone = role === 'signer' ? 'text-ink-soft' : 'text-accent'
+  const word =
+    role === 'admin' ? 'Administrator' : role === 'signer' ? 'Signer' : 'No treasury access'
   return <span className={`hidden text-[0.625rem] uppercase tracking-[0.16em] sm:inline ${tone}`}>{word}</span>
 }
