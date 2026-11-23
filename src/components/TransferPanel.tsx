@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { config } from '../config'
 import { hashscanScheduleUrl, hashscanTransactionUrl } from '../lib/hedera'
 import {
@@ -9,6 +9,7 @@ import {
   SCHEDULE_EXPIRY_DEFAULT_MINUTES,
 } from '../lib/treasury'
 import { formatUsd } from '../lib/price'
+import { shortDateTime } from '../lib/time'
 import {
   createScheduledTransfer,
   executeTransfer,
@@ -76,6 +77,14 @@ export function TransferPanel({
   const [phase, setPhase] = useState<Phase>('form')
   const [outcome, setOutcome] = useState<SubmitOutcome | null>(null)
   const [scheduleId, setScheduleId] = useState<string | null>(null)
+  /** What was actually sent — the receipt is read off this, not off the form. */
+  const [sent, setSent] = useState<{
+    recipient: string
+    amountTinybars: string
+    scheduled: boolean
+    expirySec: number | null
+    waitForExpiry: boolean
+  } | null>(null)
 
   // Above 1 of N a direct transfer is not possible — the schedule is the only
   // path, so the switch is on and locked.
@@ -117,6 +126,13 @@ export function TransferPanel({
         setErrors(built.errors)
         return
       }
+      setSent({
+        recipient: built.plan.recipientAccountId,
+        amountTinybars: built.plan.amountTinybars,
+        scheduled: true,
+        expirySec: built.plan.expirySec,
+        waitForExpiry: built.plan.waitForExpiry,
+      })
       setPhase('submitting')
       try {
         const result: ScheduleSubmitOutcome = await createScheduledTransfer(built.plan, {
@@ -138,6 +154,13 @@ export function TransferPanel({
         setErrors(built.errors)
         return
       }
+      setSent({
+        recipient: built.plan.recipientAccountId,
+        amountTinybars: built.plan.amountTinybars,
+        scheduled: false,
+        expirySec: null,
+        waitForExpiry: false,
+      })
       setPhase('submitting')
       try {
         const result = await executeTransfer(built.plan, {
@@ -176,14 +199,15 @@ export function TransferPanel({
       ) : null}
 
       {phase === 'done' && outcome ? (
-        <div className="space-y-3">
-          <OutcomeLine outcome={outcome} scheduled={scheduled} scheduleId={scheduleId} />
+        <div className="space-y-4">
+          <Confirmation outcome={outcome} sent={sent} scheduleId={scheduleId} />
           <button
             type="button"
             className={primaryAction}
             onClick={() => {
               setPhase('form')
               setOutcome(null)
+              setSent(null)
             }}
           >
             Another transfer
@@ -316,63 +340,129 @@ export function TransferPanel({
   )
 }
 
-function OutcomeLine({
+/**
+ * The receipt, as the thing the signer came for: one clear verdict, then the
+ * facts it is made of. Nothing here is assumed — the verdict is the network's
+ * own status word, read back from the mirror.
+ */
+function Confirmation({
   outcome,
-  scheduled,
+  sent,
   scheduleId,
 }: {
   outcome: SubmitOutcome
-  scheduled: boolean
+  sent: {
+    recipient: string
+    amountTinybars: string
+    scheduled: boolean
+    expirySec: number | null
+    waitForExpiry: boolean
+  } | null
   scheduleId: string | null
 }) {
-  if (outcome.kind === 'failed') {
-    return (
-      <ErrorNote>
-        {outcome.transactionId ? `The network refused the transaction: ${outcome.status}.` : outcome.status}
-      </ErrorNote>
-    )
-  }
-  if (outcome.kind === 'unverified') {
-    return (
-      <Note>
-        The wallet answered; the mirror has not indexed the transaction yet. Check the explorer.{' '}
-        <a
-          href={hashscanTransactionUrl(config.network, outcome.transactionId)}
-          target="_blank"
-          rel="noreferrer"
-          className="underline decoration-rule underline-offset-4 hover:decoration-accent"
-        >
-          HashScan
-        </a>
-      </Note>
-    )
-  }
-  if (scheduled && scheduleId) {
-    return (
-      <p className="text-sm text-ink-soft">
-        Schedule <span className="font-mono text-ink">{scheduleId}</span> created ({outcome.status}).{' '}
-        <a
-          href={hashscanScheduleUrl(config.network, scheduleId)}
-          target="_blank"
-          rel="noreferrer"
-          className="underline decoration-rule underline-offset-4 hover:decoration-accent"
-        >
-          HashScan
-        </a>
-      </p>
-    )
-  }
+  const succeeded = outcome.kind === 'succeeded'
+  const failed = outcome.kind === 'failed'
+
+  const verdict = succeeded
+    ? sent?.scheduled
+      ? 'Schedule created'
+      : 'Transaction confirmed'
+    : failed
+      ? 'The network refused it'
+      : 'Not confirmed yet'
+
+  const badge = succeeded ? 'Confirmed' : failed ? 'Failed' : 'Unconfirmed'
+  const badgeTone = succeeded ? 'border-accent text-accent' : failed ? 'border-accent bg-accent text-page' : 'border-rule text-ink-soft'
+
   return (
-    <p className="text-sm text-ink-soft">
-      {outcome.status}.{outcome.entityId ? ` Entity ${outcome.entityId}.` : ''}{' '}
-      <a
-        href={hashscanTransactionUrl(config.network, outcome.transactionId)}
-        target="_blank"
-        rel="noreferrer"
-        className="underline decoration-rule underline-offset-4 hover:decoration-accent"
-      >
-        HashScan
-      </a>
-    </p>
+    <section
+      aria-live="polite"
+      className={`border ${succeeded ? 'border-accent/60 bg-accent/[0.05]' : 'border-rule bg-page'}`}
+    >
+      <div className="flex items-start gap-3 px-4 py-4 sm:px-5">
+        <span
+          aria-hidden="true"
+          className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center border ${
+            succeeded ? 'border-accent text-accent' : failed ? 'border-accent bg-accent text-page' : 'border-rule text-ink-faint'
+          }`}
+        >
+          {succeeded ? (
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
+              <path d="M2.5 8.5l3.5 3.5 7-8" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            </svg>
+          ) : failed ? (
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
+              <path d="M3.5 3.5l9 9M12.5 3.5l-9 9" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 16 16" className="h-3.5 w-3.5">
+              <path d="M8 4v4.5M8 11.5v.5" fill="none" stroke="currentColor" strokeWidth="1.8" />
+            </svg>
+          )}
+        </span>
+
+        <div className="min-w-0">
+          <span
+            className={`inline-block border px-2 py-0.5 text-[0.5625rem] font-semibold uppercase tracking-[0.14em] ${badgeTone}`}
+          >
+            {badge}
+          </span>
+          <h3 className="mt-2 font-serif text-xl leading-tight text-ink">{verdict}</h3>
+          <p className="mt-1 text-sm leading-relaxed text-ink-soft">
+            {succeeded
+              ? sent
+                ? `${formatHbar(sent.amountTinybars)} to ${sent.recipient}${sent.scheduled ? ' — the network executes it once the threshold signed' : ''}.`
+                : 'The network accepted it.'
+              : failed
+                ? `The network answered ${outcome.kind === 'failed' ? outcome.status : ''}. Nothing was moved.`
+                : 'The wallet answered, but the mirror has not indexed the transaction yet. Check the explorer before assuming anything.'}
+          </p>
+        </div>
+      </div>
+
+      <dl className="grid gap-x-8 gap-y-2 border-t border-rule/60 px-4 py-4 text-xs sm:grid-cols-2 sm:px-5">
+        {sent ? <Fact label="Amount">{formatHbar(sent.amountTinybars)}</Fact> : null}
+        {sent ? <Fact label="Recipient">{sent.recipient}</Fact> : null}
+        {sent?.scheduled && scheduleId ? (
+          <Fact label="Schedule">
+            <a
+              href={hashscanScheduleUrl(config.network, scheduleId)}
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-rule underline-offset-2 hover:decoration-accent"
+            >
+              {scheduleId}
+            </a>
+          </Fact>
+        ) : null}
+        {sent?.scheduled && sent.expirySec !== null ? (
+          <Fact label={sent.waitForExpiry ? 'Expires (waits for it)' : 'Expires'}>
+            {shortDateTime(sent.expirySec)}
+          </Fact>
+        ) : null}
+        {outcome.transactionId ? (
+          <Fact label="Transaction">
+            <a
+              href={hashscanTransactionUrl(config.network, outcome.transactionId)}
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-rule underline-offset-2 hover:decoration-accent"
+            >
+              {outcome.transactionId}
+            </a>
+          </Fact>
+        ) : null}
+        <Fact label="Status">{outcome.kind === 'failed' ? outcome.status : succeeded ? outcome.status : 'not indexed yet'}</Fact>
+      </dl>
+    </section>
+  )
+}
+
+function Fact({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex items-baseline justify-between gap-4 border-b border-rule/40 pb-1.5 last:border-b-0">
+      <dt className="shrink-0 text-[0.5625rem] uppercase tracking-[0.16em] text-ink-faint">{label}</dt>
+      <dd className="min-w-0 text-right font-mono text-[0.6875rem] break-all text-ink-soft">{children}</dd>
+    </div>
   )
 }
