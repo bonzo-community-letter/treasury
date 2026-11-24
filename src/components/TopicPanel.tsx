@@ -27,7 +27,6 @@ type Phase = 'form' | 'submitting' | 'receipt' | 'done'
  */
 export function TopicPanel({ structure, connectedAccountId, accountIds }: Props) {
   const [memo, setMemo] = useState('')
-  const [maxFee, setMaxFee] = useState(DEFAULT_MAX_FEE_HBAR)
   const [errors, setErrors] = useState<string[]>([])
   const [phase, setPhase] = useState<Phase>('form')
   const [outcome, setOutcome] = useState<TopicSubmitOutcome | null>(null)
@@ -41,7 +40,7 @@ export function TopicPanel({ structure, connectedAccountId, accountIds }: Props)
       network: config.network,
       structure,
       memo,
-      maxFeeHbar: maxFee,
+      maxFeeHbar: DEFAULT_MAX_FEE_HBAR,
     })
     if (!built.ok) {
       setErrors(built.errors)
@@ -68,7 +67,7 @@ export function TopicPanel({ structure, connectedAccountId, accountIds }: Props)
     <Panel
       step="Create HCS topic"
       title="Create a topic that the treasury controls"
-      note={`The treasury's key becomes the topic's admin key — ${structure.threshold} of ${structure.keys.length} signers can update or delete it later. Your wallet pays the creation fee, capped below.`}
+      note={`The treasury's key becomes the topic's admin key — ${structure.threshold} of ${structure.keys.length} signers can update or delete it later. Your wallet pays the creation fee, capped at ${DEFAULT_MAX_FEE_HBAR} HBAR.`}
     >
       {phase === 'done' && outcome ? (
         <div className="space-y-4">
@@ -109,19 +108,6 @@ export function TopicPanel({ structure, connectedAccountId, accountIds }: Props)
             </p>
           </label>
 
-          <label className="block sm:max-w-[16rem]">
-            <FieldLabel>Max fee, HBAR</FieldLabel>
-            <input
-              className={inputClass}
-              value={maxFee}
-              onChange={(event) => setMaxFee(event.target.value)}
-              placeholder={DEFAULT_MAX_FEE_HBAR}
-            />
-            <p className="mt-2 text-xs leading-relaxed text-ink-faint">
-              The most this wallet can be charged for the creation.
-            </p>
-          </label>
-
           {errors.length > 0 ? (
             <ul className="space-y-1">
               {errors.map((error) => (
@@ -147,7 +133,8 @@ export function TopicPanel({ structure, connectedAccountId, accountIds }: Props)
                   : 'Create the topic'}
             </button>
             <span className="text-xs text-ink-faint">
-              Fee payer: <span className="font-mono">{connectedAccountId}</span>
+              Fee payer: <span className="font-mono">{connectedAccountId}</span> · fee capped at{' '}
+              {DEFAULT_MAX_FEE_HBAR} HBAR
             </span>
           </div>
 
