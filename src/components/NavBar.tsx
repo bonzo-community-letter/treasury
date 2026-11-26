@@ -29,7 +29,7 @@ export function NavBar({
       <div className="mx-auto flex h-14 w-full max-w-5xl items-center justify-between gap-4 px-4 sm:px-6">
         <span className="flex items-baseline gap-2">
           <span className="font-serif text-[0.9375rem] leading-none tracking-wide text-ink-soft">
-            Open letter
+            Bonzo Community Letter
           </span>
           <span className="font-serif text-[0.9375rem] leading-none tracking-wide text-ink-faint">
             Treasury
